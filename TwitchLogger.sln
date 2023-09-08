@@ -1,0 +1,51 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33815.320
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchLogger.ChatBot", "TwitchLogger.ChatBot\TwitchLogger.ChatBot.csproj", "{3EEFB952-3905-445A-959C-452D276F28A0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3} = {D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271} = {D79C17BF-5E26-4B03-9CCE-588E7D271271}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchLogger.SimpleGraphQL", "TwitchLogger.SimpleGraphQL\TwitchLogger.SimpleGraphQL.csproj", "{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchLogger.Website", "TwitchLogger.Website\TwitchLogger.Website.csproj", "{AF500B74-346B-4EEC-815A-FB5690A00951}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3} = {D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271} = {D79C17BF-5E26-4B03-9CCE-588E7D271271}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitchLogger.DTO", "TwitchLogger.DTO\TwitchLogger.DTO.csproj", "{D79C17BF-5E26-4B03-9CCE-588E7D271271}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3EEFB952-3905-445A-959C-452D276F28A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EEFB952-3905-445A-959C-452D276F28A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EEFB952-3905-445A-959C-452D276F28A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EEFB952-3905-445A-959C-452D276F28A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D72370AE-0C1C-46CB-84B8-BC1B8E36A7F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF500B74-346B-4EEC-815A-FB5690A00951}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF500B74-346B-4EEC-815A-FB5690A00951}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF500B74-346B-4EEC-815A-FB5690A00951}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF500B74-346B-4EEC-815A-FB5690A00951}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D79C17BF-5E26-4B03-9CCE-588E7D271271}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D55C24E8-56BC-411E-BA63-8AE9E4A3C40F}
+	EndGlobalSection
+EndGlobal

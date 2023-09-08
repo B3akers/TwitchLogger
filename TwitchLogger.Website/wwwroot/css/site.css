@@ -1,0 +1,96 @@
+body, html {
+    height: calc(100% - 30px);
+}
+
+.center-main {
+    display: grid;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.sidebar-panel {
+    background-color: #1f1f23;
+    width: 240px;
+    overflow-y: auto;
+    float: left;
+}
+
+    .sidebar-panel:empty {
+        display: none;
+    }
+
+    .list-item {
+        padding: 10px 10px;
+    }
+
+    .list-item:hover {
+        background-color: #26262c;
+    }
+
+.avatar-img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+}
+
+.body-content {
+    padding-left: 15px;
+    color: white;
+    overflow-wrap: break-word;
+    overflow-y: auto;
+}
+
+a:visited, a:link {
+    text-decoration: none;
+    color: lightgray;
+}
+
+a:hover {
+    text-decoration: none;
+    color: white;
+}
+
+#channelList a:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+#channelList a:visited {
+    text-decoration: none;
+    color: inherit;
+}
+
+#channelList a:link {
+    text-decoration: none;
+    color: inherit;
+}
+
+#channelList a:active {
+    text-decoration: none;
+    color: inherit;
+}
+
+.list-table {
+    overflow-y: auto;
+    max-height: 300px;
+    background-color: #0e0e10;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .sidebar-channels {
+        width: 60px;
+    }
+
+    .channel-name {
+        font-size: 0;
+    }
+
+    .sidebar-panel {
+        width: 65px;
+    }
+}

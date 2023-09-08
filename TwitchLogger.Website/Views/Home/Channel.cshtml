@@ -1,0 +1,79 @@
+﻿@{
+    ViewData["Title"] = "Channel Page";
+}
+
+@section SidebarPanel {
+    @await Html.PartialAsync("_ChannelsSideBar")
+}
+
+<div class="p-3">
+    <hr />
+    <ul class="nav nav-pills mb-auto d-flex">
+        <li class="nav-item text-center m-3 flex-fill">
+            <span data-subtab="channelStats" class="nav-link cursor-pointer active">
+                Channel stats
+            </span>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <span data-subtab="wordUsers" class="nav-link cursor-pointer">
+                Top users(word)
+            </span>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <span data-subtab="userWords" class="nav-link cursor-pointer">
+                Top user words
+            </span>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <span data-subtab="userLogs" class="nav-link cursor-pointer">
+                User logs
+            </span>
+        </li>
+    </ul>
+    <hr />
+</div>
+
+@section Scripts {
+    <script>
+        const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
+        const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
+    </script>
+
+    <script src="~/js/home.js"></script>
+    <script>
+        function onTabSwitch(e) {
+            const currentActive = document.querySelector('span[data-subtab].active');
+            if (currentActive) {
+                currentActive.removeAttribute('aria-current');
+                currentActive.classList.remove('active');
+            }
+
+            const target = e.target;
+
+            target.setAttribute('aria-current', 'page');
+            target.classList.add('active');
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('subtab', target.dataset.subtab);
+
+            window.history.replaceState(null, null, url);
+        }
+
+        (function () {
+            const tabs = document.querySelectorAll('span[data-subtab]');
+            for (let i = 0; i < tabs.length; i++) {
+                const tab = tabs[i];
+                tab.addEventListener('click', onTabSwitch);
+            }
+
+            const url = new URL(window.location.href);
+            const subtab = url.searchParams.get('subtab');
+            if (subtab) {
+                const currentSubtab = document.querySelector(`span[data-subtab="${subtab}"]`);
+                if (currentSubtab) {
+                    onTabSwitch({ target: currentSubtab });
+                }
+            }
+        })();
+    </script>
+}

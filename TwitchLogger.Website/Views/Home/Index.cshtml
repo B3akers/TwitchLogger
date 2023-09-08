@@ -1,0 +1,16 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+@section SidebarPanel {
+    @await Html.PartialAsync("_ChannelsSideBar")
+}
+
+@section Scripts {
+    <script>
+        const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
+        const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
+    </script>
+
+    <script src="~/js/home.js"></script>
+}

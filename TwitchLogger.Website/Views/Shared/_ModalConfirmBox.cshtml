@@ -1,0 +1,18 @@
+﻿@model string
+<div class="modal fade" tabindex="-1" id="confirmModal" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">Warning</h5>
+                <button type="button" class="btn-close btn-primary" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-white">@Model</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirmModalButtonYes" type="button" class="btn btn-primary" onclick="window[this.dataset.callback](this)">Yes, do it</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No, cancel</button>
+            </div>
+        </div>
+    </div>
+</div>

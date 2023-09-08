@@ -1,0 +1,33 @@
+﻿@{
+    ViewData["Title"] = "Login Page";
+}
+
+<div class="center-main">
+    <div class="container">
+        <form class="p-2" data-url="@Url.Action("AccountLogin","Login")" data-callback="loginSuccess">
+            <div class="mb-1">
+                <label>Login</label>
+                <input data-form-name="login" type="text" class="form-control" minlength="3" maxlength="32" pattern="^[a-zA-Z0-9_]*$" required="">
+            </div>
+            <div class="mb-1">
+                <label>Password</label>
+                <input data-form-name="password" type="password" class="form-control" minlength="6" maxlength="64" required="">
+            </div>
+            <div class="form-check">
+                <input id="rememberMeCheckbox" data-form-type="bool" data-form-name="rememberMe" type="checkbox" class="form-check-input">
+                <label for="rememberMeCheckbox" class="form-check-label text-white">Remember Me</label>
+            </div>
+            <div class="mb-1">
+                <button type="submit" class="btn btn-primary mt-2">Login</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function loginSuccess(json) {
+            window.location = '@Url.Action("Index","Admin")';
+        }
+    </script>
+}
