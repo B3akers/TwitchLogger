@@ -4,6 +4,8 @@
     'channel_already_added': 'Channel already added',
     'channel_added': "Channel has been added",
     'channel_deleted': 'Channel has been deleted',
+    'user_not_found': 'User not found',
+    'not_found': "Not found",
     'server_error': 'Something went wrong, please try again'
 };
 

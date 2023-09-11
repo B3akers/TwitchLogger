@@ -2,6 +2,33 @@
     ViewData["Title"] = "Channel Page";
 }
 
+@model TwitchLogger.Website.Models.ChannelViewModel
+@{
+    var dateNow = DateTimeOffset.UtcNow;
+    var dateStart = DateTimeOffset.FromUnixTimeSeconds(Model.Channel.StartTrackingDate);
+    var currentYear = dateNow.Year;
+    var deltaYear = currentYear - dateStart.Year;
+
+    void MakeYearSwitch(string type)
+    {
+        <ul class="nav nav-pills mb-auto d-flex">
+            <li class="nav-item text-center m-3 flex-fill">
+                <span data-year-switch="0" data-year-switch-for="@type" aria-current="page" class="nav-link cursor-pointer active">
+                    All years
+                </span>
+            </li>
+            @for (var i = 0; i <= deltaYear; i++)
+            {
+                <li class="nav-item text-center m-3 flex-fill">
+                    <span data-year-switch="@(currentYear - i)" data-year-switch-for="@type" class="nav-link cursor-pointer">
+                        @(currentYear - i)
+                    </span>
+                </li>
+            }
+        </ul>
+    }
+}
+
 @section SidebarPanel {
     @await Html.PartialAsync("_ChannelsSideBar")
 }
@@ -10,7 +37,7 @@
     <hr />
     <ul class="nav nav-pills mb-auto d-flex">
         <li class="nav-item text-center m-3 flex-fill">
-            <span data-subtab="channelStats" class="nav-link cursor-pointer active">
+            <span data-subtab="channelStats" aria-current="page" class="nav-link cursor-pointer active">
                 Channel stats
             </span>
         </li>
@@ -33,47 +60,87 @@
     <hr />
 </div>
 
+<div data-subtab="wordUsers" class="container d-none">
+    @{
+        MakeYearSwitch("wordUsers");
+    }
+    <form class="p-2" data-url="@Url.Action("GetTopUsers","Home")" data-callback="getTopUsersSuccess">
+        <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+        <input data-form-name="year" value="0" type="hidden">
+        <div class="mb-1">
+            <label>Word</label>
+            <input data-form-name="word" type="text" class="form-control" required="">
+        </div>
+        <div class="mb-1">
+            <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+        </div>
+    </form>
+    <hr />
+    <table id="tableWordUsers" class="table table-hover border-primary table-bordered table-striped">
+        <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">User</th>
+                <th scope="col">Count</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+<div data-subtab="userWords" class="container d-none">
+    @{
+        MakeYearSwitch("userWords");
+    }
+    <form class="p-2" data-url="@Url.Action("GetTopUserWords","Home")" data-callback="getTopUserWordsSuccess">
+        <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+        <input data-form-name="year" value="0" type="hidden">
+        <div class="mb-1">
+            <label>User</label>
+            <input data-form-name="user" type="text" class="form-control" required="">
+        </div>
+        <div class="mb-1">
+            <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+        </div>
+    </form>
+    <hr />
+    <table id="tableUserWords" class="table table-hover border-primary table-bordered table-striped">
+        <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Word</th>
+                <th scope="col">Count</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+<div data-subtab="userLogs" class="container d-none">
+    <form class="p-2" data-url="@Url.Action("GetUserLogsTimes","Home")" data-callback="getUserLogsTimesSuccess">
+        <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+        <div class="mb-1">
+            <label>User</label>
+            <input data-form-name="user" type="text" class="form-control" required="">
+        </div>
+        <div class="mb-1">
+            <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+        </div>
+    </form>
+    <hr />
+    <div class="container" id="userLogsContainer">
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
+        const getUserLogsUrl = '@Url.Action("GetUserLogs", "Home")';
         const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
     </script>
 
     <script src="~/js/home.js"></script>
-    <script>
-        function onTabSwitch(e) {
-            const currentActive = document.querySelector('span[data-subtab].active');
-            if (currentActive) {
-                currentActive.removeAttribute('aria-current');
-                currentActive.classList.remove('active');
-            }
-
-            const target = e.target;
-
-            target.setAttribute('aria-current', 'page');
-            target.classList.add('active');
-
-            const url = new URL(window.location.href);
-            url.searchParams.set('subtab', target.dataset.subtab);
-
-            window.history.replaceState(null, null, url);
-        }
-
-        (function () {
-            const tabs = document.querySelectorAll('span[data-subtab]');
-            for (let i = 0; i < tabs.length; i++) {
-                const tab = tabs[i];
-                tab.addEventListener('click', onTabSwitch);
-            }
-
-            const url = new URL(window.location.href);
-            const subtab = url.searchParams.get('subtab');
-            if (subtab) {
-                const currentSubtab = document.querySelector(`span[data-subtab="${subtab}"]`);
-                if (currentSubtab) {
-                    onTabSwitch({ target: currentSubtab });
-                }
-            }
-        })();
-    </script>
+    <script src="~/js/channel.js"></script>
 }

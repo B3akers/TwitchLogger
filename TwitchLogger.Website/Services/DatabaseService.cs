@@ -70,7 +70,7 @@ namespace TwitchLogger.Website.Services
             return _twitchWordUserStatCollections;
         }
 
-        public IMongoCollection<TwitchWordUserStatDTO> GetTwitchUsersMessageTimeCollectionForUser(string userId)
+        public IMongoCollection<TwitchWordUserStatDTO> GetTwitchWordUserStatCollectionForUser(string userId)
         {
             if (_twitchWordUserStatCollections.TryGetValue(userId, out var collection))
                 return collection;
@@ -85,9 +85,9 @@ namespace TwitchLogger.Website.Services
 
                 await collection.Indexes.CreateManyAsync(new[]
                 {
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Word), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.Count)),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.Word).Descending(x => x.Count), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
+                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }),
+                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
+                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
                 });
 
                 _twitchWordUserStatCollections[channelId] = collection;

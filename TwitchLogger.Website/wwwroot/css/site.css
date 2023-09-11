@@ -81,6 +81,11 @@ a:hover {
     cursor: pointer;
 }
 
+.container-logs {
+    max-height: 400px;
+    overflow-y: scroll;
+}
+
 @media (max-width: 900px) {
     .sidebar-channels {
         width: 60px;

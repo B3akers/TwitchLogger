@@ -23,6 +23,7 @@ namespace TwitchLogger.Website.Services
 
             var twitchAccounts = _databaseService.GetTwitchAccountsCollection();
             await twitchAccounts.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Login), new CreateIndexOptions() { Unique = true }));
+            await twitchAccounts.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.Login).Descending(x => x.RecordInsertTime), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }));
 
             var twitchUsersMessageTime = _databaseService.GetTwitchUsersMessageTimeCollection();
             await twitchUsersMessageTime.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserMessageTime>(Builders<TwitchUserMessageTime>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.RoomId), new CreateIndexOptions() { Unique = true }));

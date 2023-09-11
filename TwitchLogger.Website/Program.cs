@@ -22,6 +22,8 @@ builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepositoryService>();
 builder.Services.AddSingleton<IUserAuthentication, UserAuthenticationService>();
 builder.Services.AddSingleton<IChannelRepository, ChannelRepositoryService>();
+builder.Services.AddSingleton<IChannelStatsRepository, ChannelStatsRepositoryService>();
+builder.Services.AddSingleton<ITwitchAccountRepository, TwitchAccountRepositoryService>();
 
 builder.Services.AddHostedService<ConfigureMongoDbService>();
 builder.Services.AddHostedService<ChannelUpdateService>();

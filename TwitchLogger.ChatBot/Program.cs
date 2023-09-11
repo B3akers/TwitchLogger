@@ -86,6 +86,12 @@ class Program
                             Collation = ignoreCaseCollation,
                             IsUpsert = true
                         });
+
+                        wordUserStatUpdates.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filter.Eq(x => x.UserId, userId) & filter.Eq(x => x.Word, word) & filter.Eq(x => x.Year, 0), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, 1ul))
+                        {
+                            Collation = ignoreCaseCollation,
+                            IsUpsert = true
+                        });
                     }
 
                     if (wordUserStatUpdates.Count > 0)

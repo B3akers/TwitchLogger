@@ -2,7 +2,7 @@
 
 namespace TwitchLogger.Website.Controllers
 {
-    public class LoggerController : Controller
+    public class TrackerController : Controller
     {
         public IActionResult Index()
         {
