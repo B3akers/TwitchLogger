@@ -1,3 +1,9 @@
+var channelChatInfo = {
+    loaded: false
+};
+
+var lastUserLogUrl = '?subtab=userLogs';
+
 function getTopUserWordsSuccess(json) {
     const form = document.querySelector('form[data-callback="getTopUserWordsSuccess"]');
     const year = form.querySelector('input[data-form-name="year"]').value;
@@ -28,9 +34,36 @@ function getTopUserWordsSuccess(json) {
     }
 }
 
+function onMessageLogPin(e) {
+    const target = e.target;
+    const date = target.dataset.date;
+
+    const currentTarget = document.querySelector(`table[data-table-log-date="${date}"] tbody tr.pinned th[data-date="${date}"]`);
+    if (currentTarget) {
+        currentTarget.parentElement.classList.remove('pinned');
+    }
+
+    target.parentElement.classList.add('pinned');
+
+    if (e.isScriptSwitch) {
+        target.scrollIntoView();
+    } else {
+        const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(target.dataset.userLogin)}&userId=${encodeURIComponent(target.dataset.userId)}&date=${encodeURIComponent(date)}&msg=${target.dataset.msgId}`;
+        window.history.replaceState(null, null, newUrl);
+        lastUserLogUrl = newUrl;
+    }
+}
+
 function loadUserLogs(e) {
     const target = e.target;
     target.setAttribute('disabled', '');
+
+    if (!e.isScriptSwitch) {
+        const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(target.dataset.userLogin)}&userId=${encodeURIComponent(target.dataset.userId)}&date=${encodeURIComponent(target.dataset.time)}`;
+        window.history.replaceState(null, null, newUrl);
+        lastUserLogUrl = newUrl;
+    }
+
     fetch(getUserLogsUrl, getPostRequestOptions({
         id: target.dataset.roomId,
         user: target.dataset.userId,
@@ -39,10 +72,13 @@ function loadUserLogs(e) {
         .then((resp) => {
             if (resp.status >= 200 && resp.status < 300) {
                 const dataPromise = resp.text();
+                const logTime = target.dataset.time;
+                const userId = target.dataset.userId;
+                const userLogin = target.dataset.userLogin;
                 const logContainer = document.createElement('div');
                 logContainer.classList.add('container', 'container-logs', 'border');
                 logContainer.innerHTML = `
-                <table class="table table-hover table-striped">
+                <table data-table-log-date="${logTime}" class="table table-hover table-striped">
                        <thead>
                            <tr>
                                <th scope="col">Date</th>
@@ -57,6 +93,9 @@ function loadUserLogs(e) {
                 dataPromise.then((data) => {
                     const messages = data.split('\r\n');
                     const tbody = logContainer.querySelector('tbody');
+
+                    let pinMsg = null;
+
                     for (let i = (messages.length - 1); i >= 0; i--) {
                         const command = messages[i];
                         const commandArgs = command.split(' ');
@@ -82,24 +121,57 @@ function loadUserLogs(e) {
                             replace(/T/, ' ').
                             replace(/\..+/, '');
                         const color = senderInfos["color"] ?? '#FF4500';
-                        const badgesStr = '';
 
                         const tr = document.createElement('tr');
                         const th = document.createElement('th');
                         const tdUser = document.createElement('td');
                         const tdMessage = document.createElement('td');
 
+                        if (channelChatInfo.badges) {
+                            for (let y = 0; y < badges.length; y++) {
+                                const badgePath = badges[y].split('/');
+                                if (badgePath.length == 2) {
+                                    const badgeInfo = channelChatInfo.badges[badgePath[0]]?.[badgePath[1]] ?? null;
+                                    if (badgeInfo) {
+                                        const img = document.createElement('img');
+                                        img.setAttribute('src', badgeInfo.image);
+                                        img.setAttribute('alt', badges[y]);
+                                        img.setAttribute('title', badgeInfo.title);
+                                        img.style.marginRight = '5px';
+                                        tdUser.appendChild(img);
+                                    }
+                                }
+                            }
+                        }
+
+                        const span = document.createElement('span');
+                        span.style.color = color;
+                        span.innerText = senderInfos["display-name"];
+
                         th.innerText = dateStr;
-                        tdUser.innerText = senderInfos["display-name"];
+                        th.classList.add('cursor-pointer');
+                        th.dataset.date = logTime;
+                        th.dataset.userId = userId;
+                        th.dataset.userLogin = userLogin;
+                        th.dataset.msgId = senderInfos['id'];
+                        th.addEventListener('click', onMessageLogPin);
+                        tdUser.appendChild(span);
                         tdMessage.innerText = message;
 
                         tr.appendChild(th);
                         tr.appendChild(tdUser);
                         tr.appendChild(tdMessage);
                         tbody.appendChild(tr);
+
+                        if (e.pinMessageAfetrLog && e.pinMessageAfetrLog == th.dataset.msgId) {
+                            pinMsg = th;
+                        }
+                    }
+
+                    if (pinMsg) {
+                        onMessageLogPin({ target: pinMsg, isScriptSwitch: true });
                     }
                 });
-            
             } else if (resp.status == 404) {
                 toastr.error(translateCode('not_found'));
             } else {
@@ -118,6 +190,8 @@ function getUserLogsTimesSuccess(json) {
     const container = document.getElementById('userLogsContainer');
     container.innerHTML = '';
 
+    const userLogin = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="text"]').value;
+
     for (let i = (json.data.length - 1); i >= 0; i--) {
         const dateStr = json.data[i];
         const button = document.createElement('button');
@@ -125,11 +199,16 @@ function getUserLogsTimesSuccess(json) {
         button.classList.add('btn', 'btn-primary', 'w-100', 'm-2');
         button.innerText = dateStr;
         button.dataset.time = dateStr;
+        button.dataset.userLogin = userLogin;
         button.dataset.userId = json.userId;
         button.dataset.roomId = json.roomId;
         button.addEventListener('click', loadUserLogs);
         container.appendChild(button);
     }
+
+    const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(userLogin)}&userId=${encodeURIComponent(json.userId)}`;
+    window.history.replaceState(null, null, newUrl);
+    lastUserLogUrl = newUrl;
 }
 
 function getTopUsersSuccess(json) {
@@ -210,11 +289,10 @@ function onTabSwitch(e) {
     target.setAttribute('aria-current', 'page');
     target.classList.add('active');
 
+    const subTabName = target.dataset.subtab;
+
     if (e.isScriptSwitch) {
         const url = new URL(window.location.href);
-
-        const subTabName = url.searchParams.get('subtab');
-
         if (subTabName == 'wordUsers') {
             const year = url.searchParams.get('year');
             const word = url.searchParams.get('word');
@@ -254,8 +332,6 @@ function onTabSwitch(e) {
             }
         }
     } else {
-        const subTabName = target.dataset.subtab;
-
         let newUrl = `?subtab=${subTabName}`;
         if (subTabName == 'wordUsers') {
             const form = document.querySelector('form[data-callback="getTopUsersSuccess"]');
@@ -271,6 +347,8 @@ function onTabSwitch(e) {
             if (year && user) {
                 newUrl = `${newUrl}&year=${encodeURIComponent(year)}&user=${encodeURIComponent(user)}`
             }
+        } else if (subTabName == 'userLogs') {
+            newUrl = lastUserLogUrl;
         }
         window.history.replaceState(null, null, newUrl);
     }
@@ -278,6 +356,97 @@ function onTabSwitch(e) {
     const nextDivActive = document.querySelector(`div[data-subtab=${target.dataset.subtab}]`);
     if (nextDivActive) {
         nextDivActive.classList.remove('d-none');
+    }
+
+    if (subTabName == 'userLogs') {
+        if (!channelChatInfo.loaded) {
+            channelChatInfo.loaded = true;
+
+            const roomId = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="hidden"]').value;
+            const promisesType = ['badges', 'betterttvChannell', 'frankerfacezChannell', '7tvChannell', 'betterttvGlobal', 'frankerfacezGlobal', '7tvGlobal'];
+
+            Promise.allSettled([fetch(getChannelBadgesUrl),
+                /*fetch(`https://api.betterttv.net/3/cached/users/twitch/${roomId}`),
+                fetch(`https://api.frankerfacez.com/v1/room/id/${roomId}`),
+                fetch(`https://7tv.io/v3/users/twitch/${roomId}`),
+                fetch('https://api.betterttv.net/3/cached/emotes/global'),
+                fetch('https://api.frankerfacez.com/v1/set/global'),
+                fetch('https://7tv.io/v3/emote-sets/global')*/
+            ]
+            ).then((results) => {
+                const resultsPromises = [];
+                const resultsPromisesType = [];
+
+                for (let i = 0; i < results.length; i++) {
+                    const promise = results[i];
+                    if (promise.status == 'fulfilled') {
+                        resultsPromises.push(promise.value.json());
+                        resultsPromisesType.push(promisesType[i]);
+                    } else {
+                        console.error(promise.reason);
+                    }
+                }
+
+                Promise.allSettled(resultsPromises).then((resultsData) => {
+                    for (let i = 0; i < resultsData.length; i++) {
+                        const promise = resultsData[i];
+                        if (promise.status == 'rejected') {
+                            console.error(promise.reason);
+                            continue;
+                        }
+
+                        const jsonValue = promise.value;
+                        if (resultsPromisesType[i] == 'badges') {
+                            const badges = {};
+                            for (let y = 0; y < jsonValue.data.length; y++) {
+                                const badge = jsonValue.data[y];
+                                if (!badges[badge.setID])
+                                    badges[badge.setID] = {};
+                                badges[badge.setID][badge.version] = { image: badge.image1x, title: badge.title };
+                            }
+                            channelChatInfo.badges = badges;
+                        }
+                    }
+
+                    document.getElementById('userLogsTab1').classList.add('d-none');
+                    document.getElementById('userLogsTab2').classList.remove('d-none');
+
+                    if (e.isScriptSwitch && subTabName == 'userLogs') {
+                        const url = new URL(window.location.href);
+
+                        lastUserLogUrl = '?' + url.searchParams.toString();
+
+                        const userLogin = url.searchParams.get('userLogin');
+                        if (userLogin) {
+                            const userLoginInput = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="text"]');
+                            if (userLoginInput) {
+                                userLoginInput.value = userLogin;
+                            }
+                        }
+
+                        const userId = url.searchParams.get('userId');
+                        const date = url.searchParams.get('date');
+                        if (userId && date && roomId && userLogin) {
+                            const msg = url.searchParams.get('msg');
+                            const dummy = document.createElement('div');
+
+                            dummy.dataset.userLogin = userLogin;
+                            dummy.dataset.roomId = roomId;
+                            dummy.dataset.userId = userId;
+                            dummy.dataset.time = date;
+
+                            document.getElementById('userLogsContainer').appendChild(dummy);
+
+                            if (msg) {
+                                loadUserLogs({ target: dummy, isScriptSwitch: true, pinMessageAfetrLog: msg });
+                            } else {
+                                loadUserLogs({ target: dummy, isScriptSwitch: true });
+                            }
+                        }
+                    }
+                });
+            });
+        }
     }
 }
 

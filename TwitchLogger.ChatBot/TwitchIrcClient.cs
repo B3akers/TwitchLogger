@@ -295,8 +295,10 @@ namespace TwitchLogger.ChatBot
                         }
                     }
                 }
-                catch
+                catch (Exception e)
                 {
+                    Console.WriteLine(e.ToString());
+
                     cancelToken.Cancel();
                     cancelToken.Dispose();
                     cancelToken = null;

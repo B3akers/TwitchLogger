@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using MongoDB.Driver;
 using System.Diagnostics;
+using TwitchLogger.SimpleGraphQL;
 using TwitchLogger.Website.Interfaces;
 using TwitchLogger.Website.Models;
 
@@ -11,14 +13,16 @@ namespace TwitchLogger.Website.Controllers
         private readonly IChannelRepository _channelRepository;
         private readonly IChannelStatsRepository _channelStatsRepository;
         private readonly ITwitchAccountRepository _twitchAccountRepository;
+        private readonly IMemoryCache _memoryCache;
         private readonly string _dataLogDirectory;
 
-        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository)
+        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache)
         {
             _dataLogDirectory = configuration["Logs:DataLogDirectory"];
             _channelRepository = channelRepository;
             _channelStatsRepository = channelStatsRepository;
             _twitchAccountRepository = twitchAccountRepository;
+            _memoryCache = memoryCache;
         }
 
         public IActionResult Index()
@@ -181,6 +185,23 @@ namespace TwitchLogger.Website.Controllers
             }
 
             return NotFound();
+        }
+
+        [ResponseCache(VaryByQueryKeys = new[] { "*" }, Duration = 86400)]
+        public async Task<IActionResult> GetChannelBadges([FromQuery] string channelId)
+        {
+            var channel = await _channelRepository.GetChannelByUserId(channelId);
+            if (channel == null)
+                return NotFound();
+
+            var channelLogin = channel.Login;
+
+            return await _memoryCache.GetOrCreateAsync(channelLogin, async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                var result = await TwitchGraphQL.GetChannelBadgesInfo(channelLogin);
+                return Json(new { data = result });
+            });
         }
 
         [HttpPost]

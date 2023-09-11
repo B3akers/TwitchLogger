@@ -60,7 +60,7 @@ namespace TwitchLogger.Website.Services
 
             foreach (var channelInfo in channelsInfo)
             {
-                if (channelInfo == null)
+                if (channelInfo == null || string.IsNullOrEmpty(channelInfo.Id) )
                     continue;
 
                 bulkOps.Add(new UpdateOneModel<ChannelDTO>(Builders<ChannelDTO>.Filter.Eq(x => x.UserId, channelInfo.Id), Builders<ChannelDTO>.Update.Set(x => x.Login, channelInfo.Login).Set(x => x.DisplayName, channelInfo.DisplayName).Set(x => x.LogoUrl, channelInfo.ProfileImageURL)));

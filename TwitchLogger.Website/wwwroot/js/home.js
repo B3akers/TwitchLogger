@@ -18,7 +18,7 @@
             img.classList.add('avatar-img');
 
             const h5 = document.createElement('h5');
-            h5.classList.add('d-inline', 'channel-name');
+            h5.classList.add('d-inline-block', 'channel-name', 'align-middle');
             h5.innerText = channel.displayName;
 
             a.appendChild(img);

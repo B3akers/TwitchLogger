@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchLogger.Website", "Twi
 		{D79C17BF-5E26-4B03-9CCE-588E7D271271} = {D79C17BF-5E26-4B03-9CCE-588E7D271271}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitchLogger.DTO", "TwitchLogger.DTO\TwitchLogger.DTO.csproj", "{D79C17BF-5E26-4B03-9CCE-588E7D271271}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchLogger.DTO", "TwitchLogger.DTO\TwitchLogger.DTO.csproj", "{D79C17BF-5E26-4B03-9CCE-588E7D271271}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

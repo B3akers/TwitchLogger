@@ -17,6 +17,8 @@ builder.Services.AddAntiforgery(options =>
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddMemoryCache();
+builder.Services.AddResponseCaching();
 builder.Services.AddSingleton<DatabaseService>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepositoryService>();
@@ -43,7 +45,7 @@ app.UseSession();
 app.UseStaticFiles();
 
 app.UseRouting();
-
+app.UseResponseCaching();
 app.UseAuthorization();
 
 app.MapControllerRoute(

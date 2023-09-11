@@ -2,6 +2,12 @@ body, html {
     height: calc(100% - 30px);
 }
 
+tr.pinned {
+    border-style: solid;
+    border-width: medium;
+    border-color: #0d6efd;
+}
+
 .center-main {
     display: grid;
     justify-content: center;
@@ -31,7 +37,7 @@ body, html {
 .avatar-img {
     width: 30px;
     height: 30px;
-    border-radius: 50%;
+    margin-right: 0.3rem;
 }
 
 .body-content {

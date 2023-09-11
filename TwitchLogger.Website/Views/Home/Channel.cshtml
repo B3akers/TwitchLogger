@@ -33,6 +33,11 @@
     @await Html.PartialAsync("_ChannelsSideBar")
 }
 
+<div class="text-center mt-4">
+    <img src="@Model.Channel.LogoUrl" width="70" height="70" />
+    <h1 class="align-middle d-inline-block">@Model.Channel.DisplayName</h1>
+</div>
+
 <div class="p-3">
     <hr />
     <ul class="nav nav-pills mb-auto d-flex">
@@ -119,18 +124,25 @@
 </div>
 
 <div data-subtab="userLogs" class="container d-none">
-    <form class="p-2" data-url="@Url.Action("GetUserLogsTimes","Home")" data-callback="getUserLogsTimesSuccess">
-        <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
-        <div class="mb-1">
-            <label>User</label>
-            <input data-form-name="user" type="text" class="form-control" required="">
+
+    <div id="userLogsTab1" class="text-center">
+        Loading...
+    </div>
+
+    <div id="userLogsTab2" class="d-none">
+        <form class="p-2" data-url="@Url.Action("GetUserLogsTimes","Home")" data-callback="getUserLogsTimesSuccess">
+            <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+            <div class="mb-1">
+                <label>User</label>
+                <input data-form-name="user" type="text" class="form-control" required="">
+            </div>
+            <div class="mb-1">
+                <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+            </div>
+        </form>
+        <hr />
+        <div class="container" id="userLogsContainer">
         </div>
-        <div class="mb-1">
-            <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
-        </div>
-    </form>
-    <hr />
-    <div class="container" id="userLogsContainer">
     </div>
 </div>
 
@@ -139,6 +151,7 @@
         const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
         const getUserLogsUrl = '@Url.Action("GetUserLogs", "Home")';
         const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
+        const getChannelBadgesUrl = '@Url.Action("GetChannelBadges", "Home", new { channelId = Model.Channel.UserId})';
     </script>
 
     <script src="~/js/home.js"></script>
