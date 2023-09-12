@@ -41,8 +41,9 @@ function confirmObjectDelete(e) {
                 return;
             }
             toastr.success(translateCode(json.success));
-            if (channelsTableDatatable)
-                channelsTableDatatable.ajax.reload();
+            if (e.dataset.datatable) {
+                window[e.dataset.datatable].ajax.reload();
+            }
         }).catch((error) => {
             console.error(error);
         }).finally(() => {

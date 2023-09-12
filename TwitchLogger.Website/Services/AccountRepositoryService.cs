@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using DnsClient;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using TwitchLogger.DTO;
 using TwitchLogger.Website.Interfaces;
@@ -37,13 +38,13 @@ namespace TwitchLogger.Website.Services
             return accountDTO;
         }
 
-        public async Task DeleteAccount(AccountDTO account)
+        public async Task DeleteAccount(string accountId)
         {
             var accounts = _databaseService.GetAccountsCollection();
             var devices = _databaseService.GetDevicesCollection();
 
-            await accounts.DeleteOneAsync(x => x.Id == account.Id);
-            await devices.DeleteManyAsync(x => x.AccountId == account.Id);
+            await accounts.DeleteOneAsync(x => x.Id == accountId);
+            await devices.DeleteManyAsync(x => x.AccountId == accountId);
         }
 
         public async Task<AccountDTO> GetAccount(string accountId)
@@ -63,6 +64,12 @@ namespace TwitchLogger.Website.Services
             var accounts = _databaseService.GetAccountsCollection();
 
             return await (await accounts.FindAsync(x => x.Login == login, new FindOptions<AccountDTO>() { Collation = _ignoreCaseCollation })).FirstOrDefaultAsync();
+        }
+
+        public async Task<IEnumerable<AccountDTO>> GetAccounts()
+        {
+            var accounts = _databaseService.GetAccountsCollection();
+            return await (await accounts.FindAsync(Builders<AccountDTO>.Filter.Empty)).ToListAsync();
         }
     }
 }

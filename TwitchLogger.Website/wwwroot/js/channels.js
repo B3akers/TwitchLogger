@@ -28,6 +28,7 @@ var channelsTableDatatable = $('#channelsTable').DataTable({
 function deleteChannelClick(e) {
     document.getElementById('confirmModalButtonYes').dataset.id = e.dataset.id;
     document.getElementById('confirmModalButtonYes').dataset.url = deleteChannelUrl;
+    document.getElementById('confirmModalButtonYes').dataset.datatable = 'channelsTableDatatable';
     document.getElementById('confirmModalButtonYes').dataset.callback = 'confirmObjectDelete';
 
     $('#confirmModal').modal('show');

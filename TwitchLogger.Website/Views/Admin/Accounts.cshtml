@@ -1,0 +1,73 @@
+﻿@{
+    ViewData["Title"] = "Accounts Page";
+    var account = Context.Items["userAccount"] as TwitchLogger.DTO.AccountDTO;
+}
+
+@await Html.PartialAsync("_ModalConfirmBox", "Are you sure you want to delete this account?")
+
+@section SidebarPanel {
+    @await Html.PartialAsync("_AdminSideBar", account)
+}
+
+<div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="accountModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="accountModalLabel">Add account</h5>
+                <button type="button" class="btn-close btn-primary" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form class="p-2" data-url="@Url.Action("AddAccount","Admin")" data-callback="addAccountResponse">
+                    <div class="mb-1">
+                        <label>Login</label>
+                        <input data-form-name="login" type="text" class="form-control" minlength="4" maxlength="25" pattern="^[a-zA-Z0-9_]*$" required="">
+                    </div>
+                    <div class="mb-1">
+                        <label>Password</label>
+                        <input data-form-name="password" type="password" class="form-control" minlength="3" maxlength="32" required="">
+                    </div>
+                    <div class="form-check">
+                        <input id="isModeratorCheckbox" data-form-type="bool" data-form-name="isModerator" type="checkbox" class="form-check-input">
+                        <label for="isModeratorCheckbox" class="form-check-label text-white">Is moderator</label>
+                    </div>
+                    <div class="form-check">
+                        <input id="isAdminCheckbox" data-form-type="bool" data-form-name="isAdmin" type="checkbox" class="form-check-input">
+                        <label for="isAdminCheckbox" class="form-check-label text-white">Is admin</label>
+                    </div>
+                    <div class="mb-1">
+                        <button type="submit" class="btn btn-primary mt-2">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="p-3">
+    <div class="mb-3 d-grid gap-2 d-md-flex justify-content-md-end">
+        <button type="button" data-bs-toggle="modal" data-bs-target="#accountModal" class="btn btn-primary mt-2 float-end">Add account</button>
+    </div>
+
+    <table id="accountsTable" class="table table-striped" style="width:100%">
+        <thead>
+            <tr>
+                <th>Login</th>
+                <th>Creation time</th>
+                <th>Is moderator</th>
+                <th>Is admin</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        const deleteAccountUrl = '@Url.Action("DeleteAccount", "Admin")';
+        const getAccountsUrl = '@Url.Action("GetAccounts", "Admin")';
+    </script>
+
+    <script src="~/js/accounts.js"></script>
+}

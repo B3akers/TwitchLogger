@@ -1,0 +1,20 @@
+﻿@model TwitchLogger.DTO.AccountDTO
+<div class="p-3" style="width: 240px;">
+    <hr />
+    <ul class="nav nav-pills flex-column mb-auto">
+        <li class="nav-item">
+            <a href="@Url.Action("Channels","Admin")" class="nav-link active" aria-current="page">
+                Channels
+            </a>
+        </li>
+        @if (Model.IsAdmin)
+        {
+            <li>
+                <a href="@Url.Action("Accounts","Admin")" class="nav-link text-white">
+                    Accounts
+                </a>
+            </li>
+        }
+    </ul>
+    <hr />
+</div>

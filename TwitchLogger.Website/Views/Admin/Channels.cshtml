@@ -6,25 +6,7 @@
 @await Html.PartialAsync("_ModalConfirmBox", "Are you sure you want to delete this channel? It will cause the channel to no longer be tracked.")
 
 @section SidebarPanel {
-    <div class="p-3" style="width: 240px;">
-        <hr />
-        <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item">
-                <a href="@Url.Action("Channels","Admin")" class="nav-link active" aria-current="page">
-                    Channels
-                </a>
-            </li>
-            @if (account.IsAdmin)
-            {
-                <li>
-                    <a href="@Url.Action("Accounts","Admin")" class="nav-link text-white">
-                        Accounts
-                    </a>
-                </li>
-            }
-        </ul>
-        <hr />
-    </div>
+    @await Html.PartialAsync("_AdminSideBar", account)
 }
 
 <div class="modal fade" id="channelModal" tabindex="-1" aria-labelledby="channelModalLabel" aria-hidden="true">
