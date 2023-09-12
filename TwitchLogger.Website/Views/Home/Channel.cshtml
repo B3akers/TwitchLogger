@@ -65,6 +65,46 @@
     <hr />
 </div>
 
+<div data-subtab="channelStats" class="container">
+    <div class="container text-center d-flex">
+        <ul class="nav nav-pills w-100 mb-auto d-flex">
+            <li class="nav-item text-center m-3 flex-fill">
+                <h5>Start tracking: <span class="text-primary" data-print-type="date" data-value="@Model.Channel.StartTrackingDate"></span></h5>
+            </li>
+            <li class="nav-item text-center m-3 flex-fill">
+                <h5>Last message: <span class="text-primary" data-print-type="date" data-value="@Model.Channel.MessageLastDate"></span></h5>
+            </li>
+            <li class="nav-item text-center m-3 flex-fill">
+                <h5>Message count: <span class="text-primary" data-print-type="number" data-value="@Model.Channel.MessageCount"></span></h5>
+            </li>
+        </ul>
+    </div>
+    <hr />
+    @{
+        MakeYearSwitch("channelStats");
+    }
+    <hr />
+    <h3 class="text-center">Top words</h3>
+    <form class="d-none" data-url="@Url.Action("GetTopWords","Home")" data-callback="getTopWordsSuccess">
+        <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+        <input data-form-name="year" value="0" type="hidden">
+        <button type="submit"></button>
+    </form>
+    <div class="container p-3 container-logs border">
+        <table id="tableWords" class="table table-hover border-primary table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Word</th>
+                    <th scope="col">Count</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <div data-subtab="wordUsers" class="container d-none">
     @{
         MakeYearSwitch("wordUsers");

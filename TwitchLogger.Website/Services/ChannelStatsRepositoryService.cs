@@ -50,5 +50,18 @@ namespace TwitchLogger.Website.Services
 
             return await (await usersMessageTime.FindAsync(x => x.UserId == user && x.RoomId == channelId)).FirstOrDefaultAsync();
         }
+
+        public async Task<IEnumerable<TwitchWordStatDTO>> GetTopWords(string channelId, int year, int limit)
+        {
+            var wordStats = _databaseService.GetTwitchWordStatCollectionForUser(channelId);
+            if (wordStats == null)
+                return Enumerable.Empty<TwitchWordStatDTO>();
+
+            return await (await wordStats.FindAsync(x => x.Year == year, new FindOptions<TwitchWordStatDTO>()
+            {
+                Limit = limit,
+                Sort = Builders<TwitchWordStatDTO>.Sort.Descending(x => x.Count)
+            })).ToListAsync();
+        }
     }
 }

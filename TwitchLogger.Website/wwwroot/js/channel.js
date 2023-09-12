@@ -2,6 +2,7 @@ var channelChatInfo = {
     loaded: false
 };
 
+var channelStatsLoaded = false;
 var lastUserLogUrl = '?subtab=userLogs';
 
 function getTopUserWordsSuccess(json) {
@@ -25,7 +26,7 @@ function getTopUserWordsSuccess(json) {
         const tdCount = document.createElement('td');
 
         tdName.innerText = item.word;
-        tdCount.innerText = item.count;
+        tdCount.innerText = item.count.toLocaleString();
 
         tr.appendChild(th);
         tr.appendChild(tdName);
@@ -243,10 +244,45 @@ function getTopUsersSuccess(json) {
         const tdCount = document.createElement('td');
 
         tdName.innerText = usersData[item.userId]?.displayName ?? item.userId;
-        tdCount.innerText = item.count;
+        tdCount.innerText = item.count.toLocaleString();
 
         tr.appendChild(th);
         tr.appendChild(tdName);
+        tr.appendChild(tdCount);
+        tbody.appendChild(tr);
+    }
+}
+
+function getTopWordsSuccess(json) {
+    const form = document.querySelector('form[data-callback="getTopWordsSuccess"]');
+    const year = form.querySelector('input[data-form-name="year"]').value;
+
+    if (year != '0') {
+        window.history.replaceState(null, null, `?subtab=channelStats&year=${encodeURIComponent(year)}`);
+    }
+    else {
+        window.history.replaceState(null, null, window.location.pathname);
+    }
+
+    const tbody = document.getElementById('tableWords').querySelector('tbody');
+    tbody.innerHTML = '';
+
+    for (let i = 0; i < json.data.length; i++) {
+        const item = json.data[i];
+
+        const tr = document.createElement('tr');
+        const th = document.createElement('th');
+        th.setAttribute('scope', 'row');
+        th.innerText = (i + 1);
+
+        const tdWord = document.createElement('td');
+        const tdCount = document.createElement('td');
+
+        tdWord.innerText = item.word;
+        tdCount.innerText = item.count.toLocaleString();
+
+        tr.appendChild(th);
+        tr.appendChild(tdWord);
         tr.appendChild(tdCount);
         tbody.appendChild(tr);
     }
@@ -265,10 +301,13 @@ function onYearSwitch(e) {
     target.classList.add('active');
 
     if (!e.isScriptSwitch) {
-        const form = document.querySelector(`div[data-subtab="${target.dataset.yearSwitchFor}"] form`);
-        const yearInput = form.querySelector('input[data-form-name="year"]');
-        yearInput.value = target.dataset.yearSwitch;
-        form.requestSubmit(form.querySelector('button[type="submit"]'));
+        const forms = document.querySelectorAll(`div[data-subtab="${target.dataset.yearSwitchFor}"] form`);
+        for (let i = 0; i < forms.length; i++) {
+            const form = forms[i];
+            const yearInput = form.querySelector('input[data-form-name="year"]');
+            yearInput.value = target.dataset.yearSwitch;
+            form.requestSubmit(form.querySelector('button[type="submit"]'));
+        }
     }
 }
 
@@ -358,7 +397,17 @@ function onTabSwitch(e) {
         nextDivActive.classList.remove('d-none');
     }
 
-    if (subTabName == 'userLogs') {
+    if (subTabName == 'channelStats') {
+        if (!channelStatsLoaded) {
+            channelStatsLoaded = true;
+            const url = new URL(window.location.href);
+            const year = url.searchParams.get('year');
+
+            const currentYearSwitch = document.querySelector(`span[data-year-switch-for="channelStats"][data-year-switch="${year ?? '0'}"].active`);
+            onYearSwitch({ target: currentYearSwitch });
+
+        }
+    } else if (subTabName == 'userLogs') {
         if (!channelChatInfo.loaded) {
             channelChatInfo.loaded = true;
 
@@ -451,6 +500,19 @@ function onTabSwitch(e) {
 }
 
 (function () {
+    const printSpans = document.querySelectorAll('span[data-print-type]');
+    for (let i = 0; i < printSpans.length; i++) {
+        const span = printSpans[i];
+        const value = span.dataset.value;
+        if (span.dataset.printType == 'date') {
+            span.innerText = new Date(parseInt(value) * 1000).toISOString().
+                replace(/T/, ' ').
+                replace(/\..+/, '');
+        } else if (span.dataset.printType == 'number') {
+            span.innerText = parseInt(value).toLocaleString();
+        }
+    }
+
     const yearSwitchs = document.querySelectorAll('span[data-year-switch]');
     for (let i = 0; i < yearSwitchs.length; i++) {
         const yearSwitch = yearSwitchs[i];
@@ -464,7 +526,12 @@ function onTabSwitch(e) {
     }
 
     const url = new URL(window.location.href);
-    const subtab = url.searchParams.get('subtab');
+
+    let subtab = url.searchParams.get('subtab');
+    if (!subtab) {
+        subtab = 'channelStats';
+    }
+
     if (subtab) {
         const currentSubtab = document.querySelector(`span[data-subtab="${subtab}"]`);
         if (currentSubtab) {

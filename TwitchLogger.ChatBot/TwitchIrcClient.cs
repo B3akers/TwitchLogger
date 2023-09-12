@@ -262,7 +262,10 @@ namespace TwitchLogger.ChatBot
                                     string channel = commandArgs[3].Trim();
                                     string message = commandArgs.Length > 4 ? string.Join(' ', commandArgs.Skip(4)).Substring(1) : "";
 
-                                    senderInfos["user-login"] = commandArgs[1].Substring(1, commandArgs[1].IndexOf('!') - 1);
+                                    if (commandArgs[2] == "PRIVMSG")
+                                        senderInfos["user-login"] = commandArgs[1].Substring(1, commandArgs[1].IndexOf('!') - 1);
+                                    else
+                                        senderInfos["user-login"] = senderInfos["login"];
 
                                     await _messages.SendAsync(new TwitchChatMessage
                                     {
@@ -272,6 +275,7 @@ namespace TwitchLogger.ChatBot
                                         MessageType = GetMessageType(commandArgs[2]),
                                         Raw = command
                                     });
+
                                 }
                                 else
                                 {
