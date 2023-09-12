@@ -83,6 +83,18 @@ namespace TwitchLogger.Website.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> GetTopChatters([FromBody] GetTopWordsModel model)
+        {
+            if (!ModelState.IsValid)
+                return Json(new { error = "invalid_model" });
+
+            var data = await _channelStatsRepository.GetTopChatters(model.Id, model.Year);
+            var userData = await _twitchAccountRepository.GetTwitchAccounts(data.Select(x => x.UserId));
+          
+            return Json(new { data, userData });
+        }
+
+        [HttpPost]
         public async Task<IActionResult> GetTopWords([FromBody] GetTopWordsModel model)
         {
             if (!ModelState.IsValid)

@@ -212,6 +212,21 @@ function getUserLogsTimesSuccess(json) {
     lastUserLogUrl = newUrl;
 }
 
+function convertUserDataToObject(userData) {
+    const usersData = {};
+    for (let i = 0; i < userData.length; i++) {
+        const item = userData[i];
+        const currentItem = usersData[item.userId];
+        if (currentItem && currentItem.recordInsertTime > item.recordInsertTime) {
+            continue;
+        }
+
+        usersData[item.userId] = item;
+    }
+
+    return usersData;
+}
+
 function getTopUsersSuccess(json) {
     const form = document.querySelector('form[data-callback="getTopUsersSuccess"]');
     const year = form.querySelector('input[data-form-name="year"]').value;
@@ -222,16 +237,7 @@ function getTopUsersSuccess(json) {
     const tbody = document.getElementById('tableWordUsers').querySelector('tbody');
     tbody.innerHTML = '';
 
-    const usersData = {};
-    for (let i = 0; i < json.userData.length; i++) {
-        const item = json.userData[i];
-        const currentItem = usersData[item.userId];
-        if (currentItem && currentItem.recordInsertTime > item.recordInsertTime) {
-            continue;
-        }
-
-        usersData[item.userId] = item;
-    }
+    const usersData = convertUserDataToObject(json.userData);
 
     for (let i = 0; i < json.data.length; i++) {
         const item = json.data[i];
@@ -249,6 +255,39 @@ function getTopUsersSuccess(json) {
         tr.appendChild(th);
         tr.appendChild(tdName);
         tr.appendChild(tdCount);
+        tbody.appendChild(tr);
+    }
+}
+
+function getTopChattersSuccess(json) {
+    const usersData = convertUserDataToObject(json.userData);
+
+    const tbody = document.getElementById('tableUsers').querySelector('tbody');
+    tbody.innerHTML = '';
+
+    for (let i = 0; i < json.data.length; i++) {
+        const item = json.data[i];
+
+        const tr = document.createElement('tr');
+        const th = document.createElement('th');
+        th.setAttribute('scope', 'row');
+        th.innerText = (i + 1);
+
+        const tdUser = document.createElement('td');
+        const tdMessages = document.createElement('td');
+        const tdWords = document.createElement('td');
+        const tdChars = document.createElement('td');
+
+        tdUser.innerText = usersData[item.userId]?.displayName ?? item.userId;
+        tdMessages.innerText = item.messages.toLocaleString();
+        tdWords.innerText = item.words.toLocaleString();
+        tdChars.innerText = item.chars.toLocaleString();
+
+        tr.appendChild(th);
+        tr.appendChild(tdUser);
+        tr.appendChild(tdMessages);
+        tr.appendChild(tdWords);
+        tr.appendChild(tdChars);
         tbody.appendChild(tr);
     }
 }

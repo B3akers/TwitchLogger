@@ -1,6 +1,7 @@
 ﻿using MongoDB.Driver;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using TwitchLogger.ChatBot;
 using TwitchLogger.ChatBot.TwitchIrcClient;
 using TwitchLogger.DTO;
@@ -17,6 +18,7 @@ class Program
     private static IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
     private static ConcurrentDictionary<string, IMongoCollection<TwitchWordUserStatDTO>> _twitchWordUserStatCollections;
     private static ConcurrentDictionary<string, IMongoCollection<TwitchWordStatDTO>> _twitchWordStatCollections;
+    private static ConcurrentDictionary<string, IMongoCollection<TwitchUserStatDTO>> _twitchUserStatCollections;
 
     private static Collation ignoreCaseCollation = new Collation("en", strength: CollationStrength.Secondary);
 
@@ -74,7 +76,7 @@ class Program
                 await _twitchUsersMessageTimeCollection.UpdateOneAsync(x => x.UserId == userId && x.RoomId == roomId, Builders<TwitchUserMessageTime>.Update.AddToSet(x => x.MessageTimes, currentDate.ToString("yyyy-MM")), new UpdateOptions() { IsUpsert = true });
                 await _channelsCollection.UpdateOneAsync(x => x.UserId == roomId, Builders<ChannelDTO>.Update.Set(x => x.MessageLastDate, unixCurrentDate).Inc(x => x.MessageCount, 1ul));
 
-                if (_twitchWordUserStatCollections.TryGetValue(roomId, out var twitchWordUserStat) && _twitchWordStatCollections.TryGetValue(roomId, out var twitchWordStat))
+                if (_twitchWordUserStatCollections.TryGetValue(roomId, out var twitchWordUserStat) && _twitchWordStatCollections.TryGetValue(roomId, out var twitchWordStat) && _twitchUserStatCollections.TryGetValue(roomId, out var twitchUserStat))
                 {
                     List<UpdateOneModel<TwitchWordUserStatDTO>> wordUserStatUpdates = new List<UpdateOneModel<TwitchWordUserStatDTO>>();
                     List<UpdateOneModel<TwitchWordStatDTO>> wordStatUpdates = new List<UpdateOneModel<TwitchWordStatDTO>>();
@@ -82,6 +84,7 @@ class Program
                     var wordsMessage = GetWords(args.Message, out var initLen);
                     var filterWordUserStat = Builders<TwitchWordUserStatDTO>.Filter;
                     var filterWordStat = Builders<TwitchWordStatDTO>.Filter;
+                    var filterUserStat = Builders<TwitchUserStatDTO>.Filter;
                     var year = int.Parse(currentDate.ToString("yyyy"));
 
                     foreach (var word in wordsMessage)
@@ -110,6 +113,19 @@ class Program
                             IsUpsert = true
                         });
                     }
+
+                    var updateUserStatDef = Builders<TwitchUserStatDTO>.Update.Inc(x => x.Messages, 1ul).Inc(x => x.Words, (ulong)initLen).Inc(x => x.Chars, (ulong)args.Message.Length);
+                    await twitchUserStat.BulkWriteAsync(new[]
+                    {
+                        new UpdateOneModel<TwitchUserStatDTO>(filterUserStat.Eq(x => x.UserId, userId) & filterUserStat.Eq(x => x.Year, year), updateUserStatDef)
+                        {
+                            IsUpsert = true
+                        },
+                        new UpdateOneModel<TwitchUserStatDTO>(filterUserStat.Eq(x => x.UserId, userId) & filterUserStat.Eq(x => x.Year, 0), updateUserStatDef)
+                        {
+                            IsUpsert = true
+                        }
+                    });
 
                     if (wordUserStatUpdates.Count > 0)
                         await twitchWordUserStat.BulkWriteAsync(wordUserStatUpdates);
@@ -151,6 +167,7 @@ class Program
         _twitchUsersMessageTimeCollection = mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
         _twitchWordUserStatCollections = new();
         _twitchWordStatCollections = new();
+        _twitchUserStatCollections = new();
 
         cancellationToken = new CancellationTokenSource();
 
@@ -178,6 +195,7 @@ class Program
                 {
                     _twitchWordUserStatCollections[x.UserId] = mongoDatabase.GetCollection<TwitchWordUserStatDTO>($"twitch_word_user_stat_{x.UserId}");
                     _twitchWordStatCollections[x.UserId] = mongoDatabase.GetCollection<TwitchWordStatDTO>($"twitch_word_stat_{x.UserId}");
+                    _twitchUserStatCollections[x.UserId] = mongoDatabase.GetCollection<TwitchUserStatDTO>($"twitch_user_stat_{x.UserId}");
 
                     channelsToJoin.Add(channel);
                 }

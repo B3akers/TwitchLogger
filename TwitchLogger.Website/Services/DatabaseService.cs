@@ -16,7 +16,7 @@ namespace TwitchLogger.Website.Services
         private readonly IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
         private readonly ConcurrentDictionary<string, IMongoCollection<TwitchWordUserStatDTO>> _twitchWordUserStatCollections;
         private readonly ConcurrentDictionary<string, IMongoCollection<TwitchWordStatDTO>> _twitchWordStatCollections;
-
+        private readonly ConcurrentDictionary<string, IMongoCollection<TwitchUserStatDTO>> _twitchUserStatCollections;
 
 
         public DatabaseService(IConfiguration configuration)
@@ -32,6 +32,7 @@ namespace TwitchLogger.Website.Services
 
             _twitchWordUserStatCollections = new();
             _twitchWordStatCollections = new();
+            _twitchUserStatCollections = new();
         }
 
         public MongoClient GetMongoClient()
@@ -85,6 +86,14 @@ namespace TwitchLogger.Website.Services
             return null;
         }
 
+        public IMongoCollection<TwitchUserStatDTO> GetTwitchUserStatCollectionForUser(string userId)
+        {
+            if (_twitchUserStatCollections.TryGetValue(userId, out var collection))
+                return collection;
+
+            return null;
+        }
+
         public async Task CreateIndexesForChannel(string channelId)
         {
             {
@@ -110,6 +119,18 @@ namespace TwitchLogger.Website.Services
                 });
 
                 _twitchWordStatCollections[channelId] = collection;
+            }
+
+            {
+                var collection = _mongoDatabase.GetCollection<TwitchUserStatDTO>($"twitch_user_stat_{channelId}");
+
+                await collection.Indexes.CreateManyAsync(new[]
+                {
+                    new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true }),
+                    new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Descending(x => x.Messages).Ascending(x => x.Year)),
+                });
+
+                _twitchUserStatCollections[channelId] = collection;
             }
         }
     }
