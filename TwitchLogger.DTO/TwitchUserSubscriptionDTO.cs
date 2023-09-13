@@ -8,16 +8,17 @@ using System.Threading.Tasks;
 
 namespace TwitchLogger.DTO
 {
-    public class TwitchUserStatDTO
+    public class TwitchUserSubscriptionDTO
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
-        public string RoomId { get; set; }
-        public string UserId { get; set; }
-        public int Year { get; set; }
-        public ulong Messages { get; set; }
-        public ulong Words { get; set; }
-        public ulong Chars { get; set; }
+        public string RoomId;
+        public string UserId;
+        public string RecipientUserId;
+        public string SubPlan;
+        public string SubMessage;
+        public int CumulativeMonths;
+        public long Timestamp;
     }
 }

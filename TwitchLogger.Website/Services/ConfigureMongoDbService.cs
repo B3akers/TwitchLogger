@@ -28,6 +28,16 @@ namespace TwitchLogger.Website.Services
             var twitchUsersMessageTime = _databaseService.GetTwitchUsersMessageTimeCollection();
             await twitchUsersMessageTime.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserMessageTime>(Builders<TwitchUserMessageTime>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.RoomId), new CreateIndexOptions() { Unique = true }));
 
+            var twitchUserSubscriptions = _databaseService.GetTwitchUserSubscriptionsCollection();
+            await twitchUserSubscriptions.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserSubscriptionDTO>(Builders<TwitchUserSubscriptionDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Timestamp)));
+
+            var twitchUserStats = _databaseService.GetTwitchUserStatsCollection();
+            await twitchUserStats.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true }),
+                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Messages).Ascending(x => x.Year)),
+            });
+
             await (await channels.FindAsync(Builders<ChannelDTO>.Filter.Empty)).ForEachAsync(async x =>
             {
                 await _databaseService.CreateIndexesForChannel(x.UserId);

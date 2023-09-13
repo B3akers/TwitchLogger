@@ -37,11 +37,12 @@ function getTopUserWordsSuccess(json) {
 
 function onMessageLogPin(e) {
     const target = e.target;
-    const date = target.dataset.date;
+    const tbody = target.parentElement.parentElement;
+    const date = tbody.dataset.date;
 
-    const currentTarget = document.querySelector(`table[data-table-log-date="${date}"] tbody tr.pinned th[data-date="${date}"]`);
+    const currentTarget = document.querySelector(`table[data-table-log-date="${date}"] tbody tr.pinned`);
     if (currentTarget) {
-        currentTarget.parentElement.classList.remove('pinned');
+        currentTarget.classList.remove('pinned');
     }
 
     target.parentElement.classList.add('pinned');
@@ -49,7 +50,7 @@ function onMessageLogPin(e) {
     if (e.isScriptSwitch) {
         target.scrollIntoView();
     } else {
-        const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(target.dataset.userLogin)}&userId=${encodeURIComponent(target.dataset.userId)}&date=${encodeURIComponent(date)}&msg=${target.dataset.msgId}`;
+        const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(tbody.dataset.userLogin)}&userId=${encodeURIComponent(tbody.dataset.userId)}&date=${encodeURIComponent(date)}&msg=${target.dataset.msgId}`;
         window.history.replaceState(null, null, newUrl);
         lastUserLogUrl = newUrl;
     }
@@ -95,6 +96,10 @@ function loadUserLogs(e) {
                     const messages = data.split('\r\n');
                     const tbody = logContainer.querySelector('tbody');
 
+                    tbody.dataset.date = logTime;
+                    tbody.dataset.userId = userId;
+                    tbody.dataset.userLogin = userLogin;
+
                     let pinMsg = null;
 
                     for (let i = (messages.length - 1); i >= 0; i--) {
@@ -115,7 +120,14 @@ function loadUserLogs(e) {
                             senderInfos[splitInfo[0]] = splitInfo[1];
                         }
 
-                        const message = commandArgs.length > 4 ? commandArgs.slice(4).join(' ').substring(1) : "";
+                        let isMeCommand = false;
+                        let message = commandArgs.length > 4 ? commandArgs.slice(4).join(' ').substring(1) : "";
+                        if (message.length > 0 && message.charCodeAt(0) == 1) {
+                            const msgStartIndex = message.indexOf(' ');
+                            if (msgStartIndex != -1)
+                                message = message.substring(msgStartIndex + 1, message.length - 1);
+                            isMeCommand = true;
+                        }
 
                         const badges = senderInfos["badges"].split(',');
                         const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toISOString().
@@ -149,15 +161,18 @@ function loadUserLogs(e) {
                         span.style.color = color;
                         span.innerText = senderInfos["display-name"];
 
+                        const spanMessage = document.createElement('span');
+                        spanMessage.innerText = message;
+                        if (isMeCommand) {
+                            spanMessage.style.color = color;
+                        }
+
                         th.innerText = dateStr;
                         th.classList.add('cursor-pointer');
-                        th.dataset.date = logTime;
-                        th.dataset.userId = userId;
-                        th.dataset.userLogin = userLogin;
                         th.dataset.msgId = senderInfos['id'];
                         th.addEventListener('click', onMessageLogPin);
                         tdUser.appendChild(span);
-                        tdMessage.innerText = message;
+                        tdMessage.appendChild(spanMessage);
 
                         tr.appendChild(th);
                         tr.appendChild(tdUser);
@@ -192,6 +207,8 @@ function getUserLogsTimesSuccess(json) {
     container.innerHTML = '';
 
     const userLogin = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="text"]').value;
+
+    json.data.sort((a, b) => a.localeCompare(b));
 
     for (let i = (json.data.length - 1); i >= 0; i--) {
         const dateStr = json.data[i];

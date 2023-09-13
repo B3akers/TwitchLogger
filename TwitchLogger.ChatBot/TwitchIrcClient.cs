@@ -252,6 +252,11 @@ namespace TwitchLogger.ChatBot
                                     senderInfos[splitInfo[0]] = splitInfo[1];
                                 }
 
+                                if (senderInfos.ContainsKey("target-user-id") && !senderInfos.ContainsKey("user-id"))
+                                {
+                                    senderInfos["user-id"] = senderInfos["target-user-id"];
+                                }
+
                                 if (commandArgs[2] == "NOTICE")
                                 {
                                     Console.WriteLine(command);
@@ -261,6 +266,13 @@ namespace TwitchLogger.ChatBot
                                 {
                                     string channel = commandArgs[3].Trim();
                                     string message = commandArgs.Length > 4 ? string.Join(' ', commandArgs.Skip(4)).Substring(1) : "";
+                                    
+                                    if (!string.IsNullOrEmpty(message) && message[0] == '\x01')
+                                    {
+                                        var msgStartIndex = message.IndexOf(' ');
+                                        if (msgStartIndex != -1)
+                                            message = message.Substring(msgStartIndex + 1, message.Length - msgStartIndex - 2);
+                                    }
 
                                     if (commandArgs[2] == "PRIVMSG")
                                         senderInfos["user-login"] = commandArgs[1].Substring(1, commandArgs[1].IndexOf('!') - 1);

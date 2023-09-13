@@ -66,11 +66,8 @@ namespace TwitchLogger.Website.Services
 
         public async Task<IEnumerable<TwitchUserStatDTO>> GetTopChatters(string channelId, int year, int limit)
         {
-            var userStats = _databaseService.GetTwitchUserStatCollectionForUser(channelId);
-            if (userStats == null)
-                return Enumerable.Empty<TwitchUserStatDTO>();
-
-            return await (await userStats.FindAsync(x => x.Year == year, new FindOptions<TwitchUserStatDTO>()
+            var userStats = _databaseService.GetTwitchUserStatsCollection();
+            return await (await userStats.FindAsync(x => x.RoomId == channelId && x.Year == year, new FindOptions<TwitchUserStatDTO>()
             {
                 Limit = limit,
                 Sort = Builders<TwitchUserStatDTO>.Sort.Descending(x => x.Messages)
