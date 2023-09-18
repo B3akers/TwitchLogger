@@ -25,7 +25,7 @@ namespace TwitchLogger.Website.Services
 
         public async Task<IEnumerable<TwitchAccountDTO>> GetTwitchAccounts(IEnumerable<string> userIds)
         {
-            var twitchAccounts = _databaseService.GetTwitchAccountsCollection();
+            var twitchAccounts = _databaseService.GetTwitchAccountsStaticCollection();
             return await (await twitchAccounts.FindAsync(Builders<TwitchAccountDTO>.Filter.In(x => x.UserId, userIds))).ToListAsync();
         }
     }

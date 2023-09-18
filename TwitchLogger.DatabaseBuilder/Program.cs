@@ -29,6 +29,7 @@ class Program
     private static IMongoDatabase _mongoDatabase;
     private static IMongoCollection<ChannelDTO> _channelsCollection;
     private static IMongoCollection<TwitchAccountDTO> _twitchAccountsCollection;
+    private static IMongoCollection<TwitchAccountDTO> _twitchAccountsStaticCollection;
     private static IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
     private static IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionCollection;
     private static IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
@@ -150,6 +151,7 @@ class Program
         var filterWordUserStat = Builders<TwitchWordUserStatDTO>.Filter;
         var filterWordStat = Builders<TwitchWordStatDTO>.Filter;
 
+        Dictionary<string, Tuple<long, UpdateOneModel<TwitchAccountDTO>>> twitchAccountsStatic = new Dictionary<string, Tuple<long, UpdateOneModel<TwitchAccountDTO>>>();
         Dictionary<string, UpdateOneModel<TwitchAccountDTO>> twitchAccounts = new Dictionary<string, UpdateOneModel<TwitchAccountDTO>>();
         Dictionary<string, HashSet<string>> twitchUsersMessageTimes = new Dictionary<string, HashSet<string>>();
         Dictionary<string, Pair<long, ulong>> channelsUpdate = new();
@@ -219,6 +221,14 @@ class Program
                                     IsUpsert = true
                                 });
                             }
+
+                            if (twitchAccountsStatic.TryGetValue(userId, out var twitchAccount))
+                            {
+                                if (unixCurrentDate > twitchAccount.Item1)
+                                    twitchAccountsStatic[userId] = new Tuple<long, UpdateOneModel<TwitchAccountDTO>>(unixCurrentDate, new UpdateOneModel<TwitchAccountDTO>(filterTwitchAccount.Eq(x => x.UserId, userId), Builders<TwitchAccountDTO>.Update.Set(x => x.Login, userLogin).Set(x => x.DisplayName, userDisplayname).Set(x => x.RecordInsertTime, unixCurrentDate)) { IsUpsert = true });
+                            }
+                            else
+                                twitchAccountsStatic[userId] = new Tuple<long, UpdateOneModel<TwitchAccountDTO>>(unixCurrentDate, new UpdateOneModel<TwitchAccountDTO>(filterTwitchAccount.Eq(x => x.UserId, userId), Builders<TwitchAccountDTO>.Update.Set(x => x.Login, userLogin).Set(x => x.DisplayName, userDisplayname).Set(x => x.RecordInsertTime, unixCurrentDate)) { IsUpsert = true });
 
                             if (commandArgs[2] == "PRIVMSG")
                             {
@@ -474,6 +484,9 @@ class Program
         if (twitchAccounts.Values.Count > 0)
             await _twitchAccountsCollection.BulkWriteAsync(twitchAccounts.Values);
 
+        if (twitchAccountsStatic.Values.Count > 0)
+            await _twitchAccountsStaticCollection.BulkWriteAsync(twitchAccountsStatic.Values.Select(x => x.Item2));
+
         locksUpdate[6].Release();
     }
 
@@ -485,6 +498,9 @@ class Program
 
         Console.WriteLine("Drop database (y/n)?");
         var dropDatabase = Console.ReadLine().Trim() == "y";
+
+        Console.WriteLine("Drop indexes (y/n)?");
+        var dropIndexes = Console.ReadLine().Trim() == "y";
 
         var skipExistingChannels = false;
         if (!dropDatabase)
@@ -519,6 +535,7 @@ class Program
 
         _channelsCollection = _mongoDatabase.GetCollection<ChannelDTO>("channels");
         _twitchAccountsCollection = _mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts");
+        _twitchAccountsStaticCollection = _mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts_static");
         _twitchUsersMessageTimeCollection = _mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
         _twitchUserSubscriptionCollection = _mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
         _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
@@ -530,34 +547,52 @@ class Program
         //Create indexes
         //
         {
+            if (dropIndexes)
+            {
+                await _channelsCollection.Indexes.DropAllAsync();
+                await _twitchAccountsCollection.Indexes.DropAllAsync();
+                await _twitchUsersMessageTimeCollection.Indexes.DropAllAsync();
+                await _twitchUserSubscriptionCollection.Indexes.DropAllAsync();
+                await _twitchUserStatsCollection.Indexes.DropAllAsync();
+                await _twitchWordUserStatCollection.Indexes.DropAllAsync();
+                await _twitchWordStatCollection.Indexes.DropAllAsync();
+            }
+
             await _channelsCollection.Indexes.CreateOneAsync(new CreateIndexModel<ChannelDTO>(Builders<ChannelDTO>.IndexKeys.Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }));
 
-            await _twitchAccountsCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Login), new CreateIndexOptions() { Unique = true }));
-            await _twitchAccountsCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.Login).Descending(x => x.RecordInsertTime), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }));
+            await _twitchAccountsStaticCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }));
 
-            await _twitchUsersMessageTimeCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserMessageTime>(Builders<TwitchUserMessageTime>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.RoomId), new CreateIndexOptions() { Unique = true }));
+            await _twitchAccountsCollection.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Login), new CreateIndexOptions() { Unique = true }),
+                new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.Login).Descending(x => x.RecordInsertTime), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
+            });
+
+            await _twitchUsersMessageTimeCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserMessageTime>(Builders<TwitchUserMessageTime>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }));
 
             await _twitchUserSubscriptionCollection.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserSubscriptionDTO>(Builders<TwitchUserSubscriptionDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Timestamp)));
 
             await _twitchUserStatsCollection.Indexes.CreateManyAsync(new[]
             {
-                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true }),
-                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Messages).Ascending(x => x.Year)),
+                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }),
+                new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Messages)),
             });
 
             await _twitchWordUserStatCollection.Indexes.CreateManyAsync(new[]
             {
-                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true, Collation = new Collation("en", strength: CollationStrength.Secondary) }),
-                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
-                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.UserId).Ascending(x => x.Word), new CreateIndexOptions() { Unique = true, Collation = new Collation("en", strength: CollationStrength.Secondary) }),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.UserId).Descending(x => x.Count)),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Word).Descending(x => x.Count), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
             });
 
             await _twitchWordStatCollection.Indexes.CreateManyAsync(new[]
             {
-                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
+                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Word), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
                 new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Count))
             });
         }
+
+        Console.WriteLine("Indexes done...");
 
         var logsPath = settings["Logs"]["DataLogDirectory"].ToString();
 

@@ -17,6 +17,7 @@ class Program
 
     private static IMongoCollection<ChannelDTO> _channelsCollection;
     private static IMongoCollection<TwitchAccountDTO> _twitchAccountsCollection;
+    private static IMongoCollection<TwitchAccountDTO> _twitchAccountsStaticCollection;
     private static IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
     private static IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionCollection;
     private static IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
@@ -111,6 +112,7 @@ class Program
                 var userLogin = args.SenderInfo["user-login"];
                 var userDisplayname = args.SenderInfo["display-name"];
 
+                await _twitchAccountsStaticCollection.UpdateOneAsync(x => x.UserId == userId, Builders<TwitchAccountDTO>.Update.Set(x => x.Login, userLogin).Set(x => x.DisplayName, userDisplayname).Set(x => x.RecordInsertTime, unixCurrentDate), new UpdateOptions() { IsUpsert = true });
                 await _twitchAccountsCollection.UpdateOneAsync(x => x.UserId == userId && x.Login == userLogin, Builders<TwitchAccountDTO>.Update.Set(x => x.DisplayName, userDisplayname).SetOnInsert(x => x.RecordInsertTime, unixCurrentDate), new UpdateOptions() { IsUpsert = true });
             }
 
@@ -236,6 +238,7 @@ class Program
 
         _channelsCollection = mongoDatabase.GetCollection<ChannelDTO>("channels");
         _twitchAccountsCollection = mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts");
+        _twitchAccountsStaticCollection = mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts_static");
         _twitchUsersMessageTimeCollection = mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
         _twitchUserSubscriptionCollection = mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
         _twitchUserStatsCollection = mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");

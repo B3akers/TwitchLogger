@@ -13,6 +13,7 @@ namespace TwitchLogger.Website.Services
         private readonly IMongoCollection<DeviceDTO> _devicesCollection;
         private readonly IMongoCollection<ChannelDTO> _channelsCollection;
         private readonly IMongoCollection<TwitchAccountDTO> _twitchAccountsCollection;
+        private readonly IMongoCollection<TwitchAccountDTO> _twitchAccountsStaticCollection;
         private readonly IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
         private readonly IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionsCollection;
         private readonly IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
@@ -28,6 +29,7 @@ namespace TwitchLogger.Website.Services
             _devicesCollection = _mongoDatabase.GetCollection<DeviceDTO>("devices");
             _channelsCollection = _mongoDatabase.GetCollection<ChannelDTO>("channels");
             _twitchAccountsCollection = _mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts");
+            _twitchAccountsStaticCollection = _mongoDatabase.GetCollection<TwitchAccountDTO>("twitch_accounts_static");
             _twitchUsersMessageTimeCollection = _mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
             _twitchUserSubscriptionsCollection = _mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
             _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
@@ -63,6 +65,11 @@ namespace TwitchLogger.Website.Services
         public IMongoCollection<TwitchAccountDTO> GetTwitchAccountsCollection()
         {
             return _twitchAccountsCollection;
+        }
+
+        public IMongoCollection<TwitchAccountDTO> GetTwitchAccountsStaticCollection()
+        {
+            return _twitchAccountsStaticCollection;
         }
 
         public IMongoCollection<TwitchUserMessageTime> GetTwitchUsersMessageTimeCollection()
