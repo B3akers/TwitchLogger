@@ -1,4 +1,5 @@
 ﻿using MongoDB.Driver;
+using MongoDB.Driver.Core.Bindings;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -19,8 +20,8 @@ class Program
     private static IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
     private static IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionCollection;
     private static IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
-    private static ConcurrentDictionary<string, IMongoCollection<TwitchWordUserStatDTO>> _twitchWordUserStatCollections;
-    private static ConcurrentDictionary<string, IMongoCollection<TwitchWordStatDTO>> _twitchWordStatCollections;
+    private static IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
+    private static IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
 
     private static Collation ignoreCaseCollation = new Collation("en", strength: CollationStrength.Secondary);
 
@@ -121,47 +122,45 @@ class Program
                 await _twitchUsersMessageTimeCollection.UpdateOneAsync(x => x.UserId == userId && x.RoomId == roomId, Builders<TwitchUserMessageTime>.Update.AddToSet(x => x.MessageTimes, currentDate.ToString("yyyy-MM")), new UpdateOptions() { IsUpsert = true });
                 await _channelsCollection.UpdateOneAsync(x => x.UserId == roomId, Builders<ChannelDTO>.Update.Set(x => x.MessageLastDate, unixCurrentDate).Inc(x => x.MessageCount, 1ul));
 
-                if (_twitchWordUserStatCollections.TryGetValue(roomId, out var twitchWordUserStat) && _twitchWordStatCollections.TryGetValue(roomId, out var twitchWordStat))
+                List<UpdateOneModel<TwitchWordUserStatDTO>> wordUserStatUpdates = new List<UpdateOneModel<TwitchWordUserStatDTO>>();
+                List<UpdateOneModel<TwitchWordStatDTO>> wordStatUpdates = new List<UpdateOneModel<TwitchWordStatDTO>>();
+
+                var wordsMessage = GetWords(args.Message, out var initLen);
+                var filterWordUserStat = Builders<TwitchWordUserStatDTO>.Filter;
+                var filterWordStat = Builders<TwitchWordStatDTO>.Filter;
+                var filterUserStat = Builders<TwitchUserStatDTO>.Filter;
+                var year = int.Parse(currentDate.ToString("yyyy"));
+
+                foreach (var word in wordsMessage)
                 {
-                    List<UpdateOneModel<TwitchWordUserStatDTO>> wordUserStatUpdates = new List<UpdateOneModel<TwitchWordUserStatDTO>>();
-                    List<UpdateOneModel<TwitchWordStatDTO>> wordStatUpdates = new List<UpdateOneModel<TwitchWordStatDTO>>();
-
-                    var wordsMessage = GetWords(args.Message, out var initLen);
-                    var filterWordUserStat = Builders<TwitchWordUserStatDTO>.Filter;
-                    var filterWordStat = Builders<TwitchWordStatDTO>.Filter;
-                    var filterUserStat = Builders<TwitchUserStatDTO>.Filter;
-                    var year = int.Parse(currentDate.ToString("yyyy"));
-
-                    foreach (var word in wordsMessage)
+                    wordUserStatUpdates.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.RoomId, roomId) & filterWordUserStat.Eq(x => x.UserId, userId) & filterWordUserStat.Eq(x => x.Word, word) & filterWordUserStat.Eq(x => x.Year, year), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, 1ul))
                     {
-                        wordUserStatUpdates.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.UserId, userId) & filterWordUserStat.Eq(x => x.Word, word) & filterWordUserStat.Eq(x => x.Year, year), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, 1ul))
-                        {
-                            Collation = ignoreCaseCollation,
-                            IsUpsert = true
-                        });
+                        Collation = ignoreCaseCollation,
+                        IsUpsert = true
+                    });
 
-                        wordUserStatUpdates.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.UserId, userId) & filterWordUserStat.Eq(x => x.Word, word) & filterWordUserStat.Eq(x => x.Year, 0), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, 1ul))
-                        {
-                            Collation = ignoreCaseCollation,
-                            IsUpsert = true
-                        });
-
-                        wordStatUpdates.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.Word, word) & filterWordStat.Eq(x => x.Year, year), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, 1ul))
-                        {
-                            Collation = ignoreCaseCollation,
-                            IsUpsert = true
-                        });
-
-                        wordStatUpdates.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.Word, word) & filterWordStat.Eq(x => x.Year, 0), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, 1ul))
-                        {
-                            Collation = ignoreCaseCollation,
-                            IsUpsert = true
-                        });
-                    }
-
-                    var updateUserStatDef = Builders<TwitchUserStatDTO>.Update.Inc(x => x.Messages, 1ul).Inc(x => x.Words, (ulong)initLen).Inc(x => x.Chars, (ulong)args.Message.Length);
-                    await _twitchUserStatsCollection.BulkWriteAsync(new[]
+                    wordUserStatUpdates.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.RoomId, roomId) & filterWordUserStat.Eq(x => x.UserId, userId) & filterWordUserStat.Eq(x => x.Word, word) & filterWordUserStat.Eq(x => x.Year, 0), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, 1ul))
                     {
+                        Collation = ignoreCaseCollation,
+                        IsUpsert = true
+                    });
+
+                    wordStatUpdates.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.RoomId, roomId) & filterWordStat.Eq(x => x.Word, word) & filterWordStat.Eq(x => x.Year, year), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, 1ul))
+                    {
+                        Collation = ignoreCaseCollation,
+                        IsUpsert = true
+                    });
+
+                    wordStatUpdates.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.RoomId, roomId) & filterWordStat.Eq(x => x.Word, word) & filterWordStat.Eq(x => x.Year, 0), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, 1ul))
+                    {
+                        Collation = ignoreCaseCollation,
+                        IsUpsert = true
+                    });
+                }
+
+                var updateUserStatDef = Builders<TwitchUserStatDTO>.Update.Inc(x => x.Messages, 1ul).Inc(x => x.Words, (ulong)initLen).Inc(x => x.Chars, (ulong)args.Message.Length);
+                await _twitchUserStatsCollection.BulkWriteAsync(new[]
+                {
                         new UpdateOneModel<TwitchUserStatDTO>(filterUserStat.Eq(x => x.RoomId, roomId) & filterUserStat.Eq(x => x.UserId, userId) & filterUserStat.Eq(x => x.Year, year), updateUserStatDef)
                         {
                             IsUpsert = true
@@ -172,12 +171,11 @@ class Program
                         }
                     });
 
-                    if (wordUserStatUpdates.Count > 0)
-                        await twitchWordUserStat.BulkWriteAsync(wordUserStatUpdates);
+                if (wordUserStatUpdates.Count > 0)
+                    await _twitchWordUserStatCollection.BulkWriteAsync(wordUserStatUpdates);
 
-                    if (wordStatUpdates.Count > 0)
-                        await twitchWordStat.BulkWriteAsync(wordStatUpdates);
-                }
+                if (wordStatUpdates.Count > 0)
+                    await _twitchWordStatCollection.BulkWriteAsync(wordStatUpdates);
             }
             else if (args.MessageType == TwitchChatMessageType.USERNOTICE)
             {
@@ -227,9 +225,11 @@ class Program
 
     static async Task Main(string[] args)
     {
-        JObject settings = JObject.Parse(System.Text.Encoding.UTF8.GetString(TwitchLogger.ChatBot.Properties.Resources.appsettings));
+        JObject settings = JObject.Parse(await File.ReadAllTextAsync("appsettings.json"));
         var connectionString = settings["mongo"]["connectionString"].ToString();
         var databaseName = settings["mongo"]["databaseName"].ToString();
+
+        TwitchHelper.DataLogDirectory = settings["Logs"]["DataLogDirectory"].ToString();
 
         _client = new MongoClient(connectionString);
         var mongoDatabase = _client.GetDatabase(databaseName);
@@ -239,9 +239,8 @@ class Program
         _twitchUsersMessageTimeCollection = mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
         _twitchUserSubscriptionCollection = mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
         _twitchUserStatsCollection = mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
-
-        _twitchWordUserStatCollections = new();
-        _twitchWordStatCollections = new();
+        _twitchWordUserStatCollection = mongoDatabase.GetCollection<TwitchWordUserStatDTO>("twitch_word_user_stats");
+        _twitchWordStatCollection = mongoDatabase.GetCollection<TwitchWordStatDTO>("twitch_word_stats");
 
         cancellationToken = new CancellationTokenSource();
 
@@ -265,12 +264,11 @@ class Program
             await (await _channelsCollection.FindAsync(Builders<ChannelDTO>.Filter.Empty)).ForEachAsync(x =>
             {
                 var channel = $"#{x.Login}";
-                if (!ircBot.ChannelLists.Contains(channel))
+                if (!ircBot.ChannelLists.ContainsKey(channel))
                 {
-                    _twitchWordUserStatCollections[x.UserId] = mongoDatabase.GetCollection<TwitchWordUserStatDTO>($"twitch_word_user_stat_{x.UserId}");
-                    _twitchWordStatCollections[x.UserId] = mongoDatabase.GetCollection<TwitchWordStatDTO>($"twitch_word_stat_{x.UserId}");
-
-                    channelsToJoin.Add(channel);
+                    bool isBanned = ircBot.BannedList.TryGetValue(channel, out var lastBanResponse);
+                    if (!isBanned || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > (lastBanResponse + (3600 * 6)))
+                        channelsToJoin.Add(channel);
                 }
 
                 allChannels.Add(channel);
@@ -278,8 +276,8 @@ class Program
 
             foreach (var channel in ircBot.ChannelLists)
             {
-                if (!allChannels.Contains(channel))
-                    channelsToLeave.Add(channel);
+                if (!allChannels.Contains(channel.Key))
+                    channelsToLeave.Add(channel.Key);
             }
 
             foreach (var channel in channelsToLeave)

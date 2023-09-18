@@ -16,9 +16,8 @@ namespace TwitchLogger.Website.Services
         private readonly IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
         private readonly IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionsCollection;
         private readonly IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
-        private readonly ConcurrentDictionary<string, IMongoCollection<TwitchWordUserStatDTO>> _twitchWordUserStatCollections;
-        private readonly ConcurrentDictionary<string, IMongoCollection<TwitchWordStatDTO>> _twitchWordStatCollections;
-
+        private readonly IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
+        private readonly IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
         
         public DatabaseService(IConfiguration configuration)
         {
@@ -32,9 +31,8 @@ namespace TwitchLogger.Website.Services
             _twitchUsersMessageTimeCollection = _mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
             _twitchUserSubscriptionsCollection = _mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
             _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
-
-            _twitchWordUserStatCollections = new();
-            _twitchWordStatCollections = new();
+            _twitchWordUserStatCollection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>("twitch_word_user_stats");
+            _twitchWordStatCollection = _mongoDatabase.GetCollection<TwitchWordStatDTO>("twitch_word_stats");
         }
 
         public MongoClient GetMongoClient()
@@ -82,48 +80,14 @@ namespace TwitchLogger.Website.Services
             return _twitchUserStatsCollection;
         }
 
-        public IMongoCollection<TwitchWordUserStatDTO> GetTwitchWordUserStatCollectionForUser(string userId)
+        public IMongoCollection<TwitchWordUserStatDTO> GetTwitchWordUserStatCollection()
         {
-            if (_twitchWordUserStatCollections.TryGetValue(userId, out var collection))
-                return collection;
-
-            return null;
+            return _twitchWordUserStatCollection;
         }
 
-        public IMongoCollection<TwitchWordStatDTO> GetTwitchWordStatCollectionForUser(string userId)
+        public IMongoCollection<TwitchWordStatDTO> GetTwitchWordStatCollection()
         {
-            if (_twitchWordStatCollections.TryGetValue(userId, out var collection))
-                return collection;
-
-            return null;
-        }
-
-        public async Task CreateIndexesForChannel(string channelId)
-        {
-            {
-                var collection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>($"twitch_word_user_stat_{channelId}");
-
-                await collection.Indexes.CreateManyAsync(new[]
-                {
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
-                });
-
-                _twitchWordUserStatCollections[channelId] = collection;
-            }
-
-            {
-                var collection = _mongoDatabase.GetCollection<TwitchWordStatDTO>($"twitch_word_stat_{channelId}");
-
-                await collection.Indexes.CreateManyAsync(new[]
-                {
-                    new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
-                    new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.Year).Descending(x => x.Count))
-                });
-
-                _twitchWordStatCollections[channelId] = collection;
-            }
+            return _twitchWordStatCollection;
         }
     }
 }

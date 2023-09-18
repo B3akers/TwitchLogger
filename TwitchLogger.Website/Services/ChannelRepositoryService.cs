@@ -41,7 +41,6 @@ namespace TwitchLogger.Website.Services
             };
 
             await channels.InsertOneAsync(channel);
-            await _databaseService.CreateIndexesForChannel(channel.UserId);
 
             return channel;
         }

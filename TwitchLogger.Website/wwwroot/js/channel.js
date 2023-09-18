@@ -130,9 +130,7 @@ function loadUserLogs(e) {
                         }
 
                         const badges = senderInfos["badges"].split(',');
-                        const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toISOString().
-                            replace(/T/, ' ').
-                            replace(/\..+/, '');
+                        const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toLocaleString();
                         const color = senderInfos["color"] ?? '#FF4500';
 
                         const tr = document.createElement('tr');
@@ -167,9 +165,14 @@ function loadUserLogs(e) {
                             spanMessage.style.color = color;
                         }
 
+                        let messageId = senderInfos['id'];
+                        if (!messageId) {
+                            messageId = senderInfos['tmi-sent-ts'];
+                        }
+
                         th.innerText = dateStr;
                         th.classList.add('cursor-pointer');
-                        th.dataset.msgId = senderInfos['id'];
+                        th.dataset.msgId = messageId;
                         th.addEventListener('click', onMessageLogPin);
                         tdUser.appendChild(span);
                         tdMessage.appendChild(spanMessage);
@@ -459,7 +462,7 @@ function onTabSwitch(e) {
             const url = new URL(window.location.href);
             const year = url.searchParams.get('year');
 
-            const currentYearSwitch = document.querySelector(`span[data-year-switch-for="channelStats"][data-year-switch="${year ?? '0'}"].active`);
+            const currentYearSwitch = document.querySelector(`span[data-year-switch-for="channelStats"][data-year-switch="${year ?? '0'}"]`);
             onYearSwitch({ target: currentYearSwitch });
 
         }
@@ -561,9 +564,7 @@ function onTabSwitch(e) {
         const span = printSpans[i];
         const value = span.dataset.value;
         if (span.dataset.printType == 'date') {
-            span.innerText = new Date(parseInt(value) * 1000).toISOString().
-                replace(/T/, ' ').
-                replace(/\..+/, '');
+            span.innerText = new Date(parseInt(value) * 1000).toLocaleString();
         } else if (span.dataset.printType == 'number') {
             span.innerText = parseInt(value).toLocaleString();
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
@@ -48,7 +49,8 @@ namespace TwitchLogger.ChatBot
             const int port = 6667;
 
             public event Func<object, TwitchChatMessage, Task> OnMessage;
-            public HashSet<string> ChannelLists = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public ConcurrentDictionary<string, byte> ChannelLists = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+            public ConcurrentDictionary<string, long> BannedList = new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
             private TcpClient _tcpClient = null;
 
@@ -147,13 +149,13 @@ namespace TwitchLogger.ChatBot
 
             public async Task JoinChannel(string channel)
             {
-                ChannelLists.Add(channel);
+                ChannelLists.TryAdd(channel, 1);
                 await _streamWriter.WriteLineAsync($"JOIN {channel}");
             }
 
             public async Task LeaveChannel(string channel)
             {
-                ChannelLists.Remove(channel);
+                ChannelLists.Remove(channel, out var _);
                 await _streamWriter.WriteLineAsync($"PART {channel}");
             }
 
@@ -259,6 +261,16 @@ namespace TwitchLogger.ChatBot
 
                                 if (commandArgs[2] == "NOTICE")
                                 {
+                                    if (commandArgs.Length > 3)
+                                    {
+                                        string channel = commandArgs[3].Trim();
+                                        if (commandArgs[0].StartsWith("@msg-id=msg_channel_suspended"))
+                                        {
+                                            var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                                            ChannelLists.Remove(channel, out var _);
+                                            BannedList.AddOrUpdate(channel, currentTime, (key, old) => currentTime);
+                                        }
+                                    }
                                     Console.WriteLine(command);
                                 }
 
@@ -266,7 +278,7 @@ namespace TwitchLogger.ChatBot
                                 {
                                     string channel = commandArgs[3].Trim();
                                     string message = commandArgs.Length > 4 ? string.Join(' ', commandArgs.Skip(4)).Substring(1) : "";
-                                    
+
                                     if (!string.IsNullOrEmpty(message) && message[0] == '\x01')
                                     {
                                         var msgStartIndex = message.IndexOf(' ');
@@ -326,7 +338,7 @@ namespace TwitchLogger.ChatBot
 
                         foreach (var channel in ChannelLists)
                         {
-                            await JoinChannel(channel);
+                            await JoinChannel(channel.Key);
                             await Task.Delay(1200);
                         }
                     }

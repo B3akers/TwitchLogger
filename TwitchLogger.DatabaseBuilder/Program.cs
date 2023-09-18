@@ -8,6 +8,8 @@ using TwitchLogger.DTO;
 using TwitchLogger.SimpleGraphQL;
 using System.Threading.Channels;
 using System.Collections.Generic;
+using System.Threading;
+using System;
 
 public class Pair<T1, T2>
 {
@@ -30,8 +32,8 @@ class Program
     private static IMongoCollection<TwitchUserMessageTime> _twitchUsersMessageTimeCollection;
     private static IMongoCollection<TwitchUserSubscriptionDTO> _twitchUserSubscriptionCollection;
     private static IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
-    private static ConcurrentDictionary<string, IMongoCollection<TwitchWordUserStatDTO>> _twitchWordUserStatCollections;
-    private static ConcurrentDictionary<string, IMongoCollection<TwitchWordStatDTO>> _twitchWordStatCollections;
+    private static IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
+    private static IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
 
     private static Collation ignoreCaseCollation = new Collation("en", strength: CollationStrength.Secondary);
 
@@ -124,18 +126,18 @@ class Program
         return list;
     }
 
-    static object[] locksUpdate = new object[10]
+    static SemaphoreSlim[] locksUpdate = new SemaphoreSlim[10]
     {
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object(),
-        new object()
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1),
+       new SemaphoreSlim(1, 1)
     };
 
     static async Task ProcessLogFile(string file)
@@ -383,45 +385,42 @@ class Program
             }
         }
 
-        lock (locksUpdate[0])
-        {
-            if (channelSubsUpdate.Count > 0)
-                _twitchUserSubscriptionCollection.InsertMany(channelSubsUpdate);
-        }
+        await locksUpdate[0].WaitAsync();
+        if (channelSubsUpdate.Count > 0)
+            await _twitchUserSubscriptionCollection.InsertManyAsync(channelSubsUpdate);
+        locksUpdate[0].Release();
 
         foreach (var wordStat in wordsUpdate)
         {
             var data = wordStat.Key.Split('?');
-            var collection = _twitchWordStatCollections[data[0]];
             List<UpdateOneModel<TwitchWordStatDTO>> wordStats = new();
 
             foreach (var word in wordStat.Value)
             {
-                wordStats.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.Word, word.Key) & filterWordStat.Eq(x => x.Year, int.Parse(data[1])), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, word.Value)) { Collation = ignoreCaseCollation, IsUpsert = true });
+                wordStats.Add(new UpdateOneModel<TwitchWordStatDTO>(filterWordStat.Eq(x => x.RoomId, data[0]) & filterWordStat.Eq(x => x.Word, word.Key) & filterWordStat.Eq(x => x.Year, int.Parse(data[1])), Builders<TwitchWordStatDTO>.Update.Inc(x => x.Count, word.Value)) { Collation = ignoreCaseCollation, IsUpsert = true });
             }
-            lock (locksUpdate[1])
-            {
-                collection.BulkWrite(wordStats);
-            }
+
+            await locksUpdate[1].WaitAsync();
+            if (wordStats.Count > 0)
+                await _twitchWordStatCollection.BulkWriteAsync(wordStats);
+            locksUpdate[1].Release();
         }
 
         foreach (var userWordStat in userWordsUpdate)
         {
-            var collection = _twitchWordUserStatCollections[userWordStat.Key];
-
             List<UpdateOneModel<TwitchWordUserStatDTO>> userWordStats = new();
             foreach (var item in userWordStat.Value)
             {
                 var data = item.Key.Split('?');
                 foreach (var word in item.Value)
                 {
-                    userWordStats.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.UserId, data[0]) & filterWordUserStat.Eq(x => x.Word, word.Key) & filterWordUserStat.Eq(x => x.Year, int.Parse(data[1])), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, word.Value)) { Collation = ignoreCaseCollation, IsUpsert = true });
+                    userWordStats.Add(new UpdateOneModel<TwitchWordUserStatDTO>(filterWordUserStat.Eq(x => x.RoomId, userWordStat.Key) & filterWordUserStat.Eq(x => x.UserId, data[0]) & filterWordUserStat.Eq(x => x.Word, word.Key) & filterWordUserStat.Eq(x => x.Year, int.Parse(data[1])), Builders<TwitchWordUserStatDTO>.Update.Inc(x => x.Count, word.Value)) { Collation = ignoreCaseCollation, IsUpsert = true });
                 }
             }
-            lock (locksUpdate[2])
-            {
-                collection.BulkWrite(userWordStats);
-            }
+            await locksUpdate[2].WaitAsync();
+            if (userWordStats.Count > 0)
+                await _twitchWordUserStatCollection.BulkWriteAsync(userWordStats);
+            locksUpdate[2].Release();
         }
 
         foreach (var userStat in userStatsUpdate)
@@ -434,10 +433,10 @@ class Program
                     Builders<TwitchUserStatDTO>.Update.Inc(x => x.Messages, item.Value.First).Inc(x => x.Words, item.Value.Second).Inc(x => x.Chars, item.Value.Third))
                 { IsUpsert = true });
             }
-            lock (locksUpdate[3])
-            {
-                _twitchUserStatsCollection.BulkWrite(usersStatsUpdates);
-            }
+            await locksUpdate[3].WaitAsync();
+            if (usersStatsUpdates.Count > 0)
+                await _twitchUserStatsCollection.BulkWriteAsync(usersStatsUpdates);
+            locksUpdate[3].Release();
         }
 
         List<UpdateOneModel<TwitchUserMessageTime>> messageTimes = new();
@@ -450,11 +449,12 @@ class Program
             });
         }
 
-        lock (locksUpdate[4])
-        {
-            if (messageTimes.Count > 0)
-                _twitchUsersMessageTimeCollection.BulkWrite(messageTimes);
-        }
+        await locksUpdate[4].WaitAsync();
+
+        if (messageTimes.Count > 0)
+            await _twitchUsersMessageTimeCollection.BulkWriteAsync(messageTimes);
+
+        locksUpdate[4].Release();
 
         List<UpdateOneModel<ChannelDTO>> channelsUpdateBulk = new();
         foreach (var channel in channelsUpdate)
@@ -462,57 +462,58 @@ class Program
             channelsUpdateBulk.Add(new UpdateOneModel<ChannelDTO>(Builders<ChannelDTO>.Filter.Eq(x => x.UserId, channel.Key), Builders<ChannelDTO>.Update.Inc(x => x.MessageCount, channel.Value.Second)));
             channelsUpdateBulk.Add(new UpdateOneModel<ChannelDTO>(Builders<ChannelDTO>.Filter.Eq(x => x.UserId, channel.Key), Builders<ChannelDTO>.Update.Max(x => x.MessageLastDate, channel.Value.First)));
         }
-        lock (locksUpdate[5])
-        {
-            if (channelsUpdateBulk.Count > 0)
-                _channelsCollection.BulkWrite(channelsUpdateBulk);
-        }
-      
-        lock (locksUpdate[6])
-        {
-            if (twitchAccounts.Values.Count > 0)
-                _twitchAccountsCollection.BulkWrite(twitchAccounts.Values);
-        }
-    }
+        await locksUpdate[5].WaitAsync();
 
-    static async Task CreateIndexesForChannel(string channelId)
-    {
-        {
-            var collection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>($"twitch_word_user_stat_{channelId}");
+        if (channelsUpdateBulk.Count > 0)
+            await _channelsCollection.BulkWriteAsync(channelsUpdateBulk);
 
-            await collection.Indexes.CreateManyAsync(new[]
-            {
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) }),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
-                    new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
-            });
+        locksUpdate[5].Release();
 
-            _twitchWordUserStatCollections[channelId] = collection;
-        }
+        await locksUpdate[6].WaitAsync();
 
-        {
-            var collection = _mongoDatabase.GetCollection<TwitchWordStatDTO>($"twitch_word_stat_{channelId}");
+        if (twitchAccounts.Values.Count > 0)
+            await _twitchAccountsCollection.BulkWriteAsync(twitchAccounts.Values);
 
-            await collection.Indexes.CreateManyAsync(new[]
-            {
-                    new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
-                    new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.Year).Descending(x => x.Count))
-            });
-
-            _twitchWordStatCollections[channelId] = collection;
-        }
+        locksUpdate[6].Release();
     }
 
     static async Task Main(string[] args)
     {
-        JObject settings = JObject.Parse(System.Text.Encoding.UTF8.GetString(TwitchLogger.DatabaseBuilder.Properties.Resources.appsettings));
+        JObject settings = JObject.Parse(await File.ReadAllTextAsync("appsettings.json"));
         var connectionString = settings["mongo"]["connectionString"].ToString();
         var databaseName = settings["mongo"]["databaseName"].ToString();
 
-        Console.WriteLine("Cleanup...");
+        Console.WriteLine("Drop database (y/n)?");
+        var dropDatabase = Console.ReadLine().Trim() == "y";
+
+        var skipExistingChannels = false;
+        if (!dropDatabase)
+        {
+            Console.WriteLine("Skip existing channels (y/n)?");
+            skipExistingChannels = Console.ReadLine().Trim() == "y";
+        }
+
+        Console.WriteLine("Dataset date range format {start-end} example -2023.09");
+        var dateRange = Console.ReadLine();
+        var startDate = DateTimeOffset.FromUnixTimeSeconds(0);
+        var endDate = DateTimeOffset.UtcNow.AddYears(1);
+
+        if (dateRange.IndexOf('-') != -1)
+        {
+            var splitted = dateRange.Split('-');
+            if (!string.IsNullOrEmpty(splitted[0]))
+                startDate = DateTimeOffset.ParseExact(splitted[0], "yyyy.MM", CultureInfo.InvariantCulture.DateTimeFormat);
+
+            if (!string.IsNullOrEmpty(splitted[1]))
+                endDate = DateTimeOffset.ParseExact(splitted[1], "yyyy.MM", CultureInfo.InvariantCulture.DateTimeFormat);
+        }
 
         var _client = new MongoClient(connectionString);
-        await _client.DropDatabaseAsync(databaseName);
+        if (dropDatabase)
+        {
+            Console.WriteLine("Cleanup...");
+            await _client.DropDatabaseAsync(databaseName);
+        }
 
         _mongoDatabase = _client.GetDatabase(databaseName);
 
@@ -521,9 +522,8 @@ class Program
         _twitchUsersMessageTimeCollection = _mongoDatabase.GetCollection<TwitchUserMessageTime>("twitch_users_message_time");
         _twitchUserSubscriptionCollection = _mongoDatabase.GetCollection<TwitchUserSubscriptionDTO>("twitch_user_subscriptions");
         _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
-
-        _twitchWordUserStatCollections = new();
-        _twitchWordStatCollections = new();
+        _twitchWordUserStatCollection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>("twitch_word_user_stats");
+        _twitchWordStatCollection = _mongoDatabase.GetCollection<TwitchWordStatDTO>("twitch_word_stats");
 
         Console.WriteLine("Starting...");
 
@@ -544,6 +544,19 @@ class Program
                 new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true }),
                 new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Messages).Ascending(x => x.Year)),
             });
+
+            await _twitchWordUserStatCollection.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true, Collation = new Collation("en", strength: CollationStrength.Secondary) }),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
+            });
+
+            await _twitchWordStatCollection.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
+                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Count))
+            });
         }
 
         var logsPath = settings["Logs"]["DataLogDirectory"].ToString();
@@ -551,11 +564,12 @@ class Program
         if (!Directory.Exists(logsPath))
             return;
 
-
-        List<Task> currentTasks = new List<Task>();
-
-        foreach (var channel in Directory.GetDirectories(logsPath))
+        var directories = Directory.GetDirectories(logsPath);
+        for (var i = 0; i < directories.Length; i++)
         {
+            Console.WriteLine($"Starting channel process {i + 1}/{directories.Length}...");
+
+            var channel = directories[i];
             List<Tuple<DateTimeOffset, string>> logsFiles = new();
             foreach (var year in Directory.GetDirectories(Path.Combine(channel, "channel")))
             {
@@ -597,15 +611,24 @@ class Program
                 channelData.DisplayName = result.Item1;
             }
 
-            await CreateIndexesForChannel(channelData.Id);
-            await _channelsCollection.InsertOneAsync(new ChannelDTO() { UserId = channelData.Id, Login = channelData.Login, DisplayName = channelData.DisplayName, LogoUrl = channelData.ProfileImageURL, MessageCount = 0, MessageLastDate = 0, StartTrackingDate = result.Item2 });
+            var channelExisted = false;
+            if (await (await _channelsCollection.FindAsync(x => x.UserId == channelData.Id)).FirstOrDefaultAsync() == null)
+                await _channelsCollection.InsertOneAsync(new ChannelDTO() { UserId = channelData.Id, Login = channelData.Login, DisplayName = channelData.DisplayName, LogoUrl = channelData.ProfileImageURL, MessageCount = 0, MessageLastDate = 0, StartTrackingDate = result.Item2 });
+            else
+                channelExisted = true;
 
-            foreach (var logfile in logsFiles)
+            if (!channelExisted || !skipExistingChannels)
             {
-                var file = logfile.Item2;
-                currentTasks.Add(Task.Run(() => ProcessLogFile(file)));
+                var currentFiles = 0;
+                var files = logsFiles.Where(x => x.Item1 >= startDate && x.Item1 < endDate).Select(x => x.Item2).ToList();
+                await Parallel.ForEachAsync(files, new ParallelOptions { MaxDegreeOfParallelism = 15 }, async (item, cancellationToken) =>
+                {
+                    await ProcessLogFile(item);
+                    Console.WriteLine($"Done item process {++currentFiles}/{files.Count}");
+                });
             }
-            await Task.WhenAll(currentTasks);
+
+            Console.WriteLine($"Done channel process {i + 1}/{directories.Length}");
         }
 
         Console.WriteLine("Imported!");

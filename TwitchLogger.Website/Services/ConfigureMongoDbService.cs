@@ -1,4 +1,5 @@
 ﻿using MongoDB.Driver;
+using System.Threading.Channels;
 using TwitchLogger.DTO;
 
 namespace TwitchLogger.Website.Services
@@ -38,9 +39,19 @@ namespace TwitchLogger.Website.Services
                 new CreateIndexModel<TwitchUserStatDTO>(Builders<TwitchUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Messages).Ascending(x => x.Year)),
             });
 
-            await (await channels.FindAsync(Builders<ChannelDTO>.Filter.Empty)).ForEachAsync(async x =>
+            var twitchWordUserStat = _databaseService.GetTwitchWordUserStatCollection();
+            await twitchWordUserStat.Indexes.CreateManyAsync(new[]
             {
-                await _databaseService.CreateIndexesForChannel(x.UserId);
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Unique = true, Collation = new Collation("en", strength: CollationStrength.Secondary) }),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.UserId).Descending(x => x.Count).Ascending(x => x.Year)),
+                new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Descending(x => x.Count).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
+            });
+
+            var twitchWordStat = _databaseService.GetTwitchWordStatCollection();
+            await twitchWordStat.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Word).Ascending(x => x.Year), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
+                new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Count))
             });
         }
 

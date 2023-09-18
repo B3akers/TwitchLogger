@@ -59,15 +59,5 @@ namespace TwitchLogger.ChatBot.Properties {
                 resourceCulture = value;
             }
         }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] appsettings {
-            get {
-                object obj = ResourceManager.GetObject("appsettings", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
     }
 }

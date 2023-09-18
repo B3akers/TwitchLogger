@@ -13,6 +13,7 @@ namespace TwitchLogger.DTO
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
+        public string RoomId { get; set; }
         public string Word { get; set; }
         public int Year { get; set; }
         public ulong Count { get; set; }

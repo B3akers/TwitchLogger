@@ -10,7 +10,7 @@ namespace TwitchLogger.ChatBot
 {
     public static class TwitchHelper
     {
-        public static string DataLogDirectory = "/logstorage/twitch_database";
+        public static string DataLogDirectory = "data";
         private static bool _fullScan = true;
 
         public static void Compress(string filePath)

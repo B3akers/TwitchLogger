@@ -1,0 +1,2 @@
+dotnet build --configuration Release --runtime linux-x64 --no-self-contained
+dotnet publish --configuration Release --runtime linux-x64 --no-self-contained

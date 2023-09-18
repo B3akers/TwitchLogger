@@ -18,11 +18,8 @@ namespace TwitchLogger.Website.Services
 
         public async Task<IEnumerable<TwitchWordUserStatDTO>> GetTopUserWords(string channelId, string user, int year, int limit)
         {
-            var wordUserStats = _databaseService.GetTwitchWordUserStatCollectionForUser(channelId);
-            if (wordUserStats == null)
-                return Enumerable.Empty<TwitchWordUserStatDTO>();
-
-            return await (await wordUserStats.FindAsync(x => x.UserId == user && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
+            var wordUserStats = _databaseService.GetTwitchWordUserStatCollection();
+            return await (await wordUserStats.FindAsync(x => x.RoomId == channelId && x.UserId == user && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
             {
                 Collation = _ignoreCaseCollation,
                 Limit = limit,
@@ -32,11 +29,8 @@ namespace TwitchLogger.Website.Services
 
         public async Task<IEnumerable<TwitchWordUserStatDTO>> GetTopUsers(string channelId, string word, int year, int limit)
         {
-            var wordUserStats = _databaseService.GetTwitchWordUserStatCollectionForUser(channelId);
-            if (wordUserStats == null)
-                return Enumerable.Empty<TwitchWordUserStatDTO>();
-
-            return await (await wordUserStats.FindAsync(x => x.Word == word && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
+            var wordUserStats = _databaseService.GetTwitchWordUserStatCollection();
+            return await (await wordUserStats.FindAsync(x => x.RoomId == channelId && x.Word == word && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
             {
                 Collation = _ignoreCaseCollation,
                 Limit = limit,
@@ -53,11 +47,8 @@ namespace TwitchLogger.Website.Services
 
         public async Task<IEnumerable<TwitchWordStatDTO>> GetTopWords(string channelId, int year, int limit)
         {
-            var wordStats = _databaseService.GetTwitchWordStatCollectionForUser(channelId);
-            if (wordStats == null)
-                return Enumerable.Empty<TwitchWordStatDTO>();
-
-            return await (await wordStats.FindAsync(x => x.Year == year, new FindOptions<TwitchWordStatDTO>()
+            var wordStats = _databaseService.GetTwitchWordStatCollection();
+            return await (await wordStats.FindAsync(x => x.RoomId == channelId && x.Year == year, new FindOptions<TwitchWordStatDTO>()
             {
                 Limit = limit,
                 Sort = Builders<TwitchWordStatDTO>.Sort.Descending(x => x.Count)
