@@ -12,6 +12,11 @@ namespace TwitchLogger.Website.Services
             _databaseService = databaseService;
         }
 
+        public async Task<long> GetEstimatedUniqueCount()
+        {
+           return await _databaseService.GetTwitchAccountsStaticCollection().EstimatedDocumentCountAsync();
+        }
+
         public async Task<TwitchAccountDTO> GetTwitchAccountByLogin(string login)
         {
             var twitchAccounts = _databaseService.GetTwitchAccountsCollection();

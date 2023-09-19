@@ -1,10 +1,12 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System.Collections.ObjectModel;
 using System.Threading.Channels;
 using TwitchLogger.DTO;
 using TwitchLogger.SimpleGraphQL;
 using TwitchLogger.Website.Interfaces;
+using static MongoDB.Bson.Serialization.Serializers.SerializerHelper;
 
 namespace TwitchLogger.Website.Services
 {
@@ -59,7 +61,7 @@ namespace TwitchLogger.Website.Services
 
             foreach (var channelInfo in channelsInfo)
             {
-                if (channelInfo == null || string.IsNullOrEmpty(channelInfo.Id) )
+                if (channelInfo == null || string.IsNullOrEmpty(channelInfo.Id))
                     continue;
 
                 bulkOps.Add(new UpdateOneModel<ChannelDTO>(Builders<ChannelDTO>.Filter.Eq(x => x.UserId, channelInfo.Id), Builders<ChannelDTO>.Update.Set(x => x.Login, channelInfo.Login).Set(x => x.DisplayName, channelInfo.DisplayName).Set(x => x.LogoUrl, channelInfo.ProfileImageURL)));
@@ -84,6 +86,24 @@ namespace TwitchLogger.Website.Services
             var channels = _databaseService.GetChannelsCollection();
 
             await channels.DeleteOneAsync(x => x.Id == channelId);
+        }
+
+        public async Task<long> GetEstimatedCount()
+        {
+            return await _databaseService.GetChannelsCollection().EstimatedDocumentCountAsync();
+        }
+
+        public async Task<long> GetAllMessagesCount()
+        {
+            var channels = _databaseService.GetChannelsCollection();
+
+            ulong total = 0;
+            await (await channels.FindAsync(Builders<ChannelDTO>.Filter.Empty)).ForEachAsync(x =>
+            {
+                total += x.MessageCount;
+            });
+
+            return (long)total;
         }
     }
 }

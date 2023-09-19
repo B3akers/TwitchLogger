@@ -2,7 +2,7 @@ body, html {
     height: calc(100% - 30px);
 }
 
-tr.pinned {
+div.pinned {
     border-style: solid;
     border-width: medium;
     border-color: #0d6efd;
@@ -90,6 +90,8 @@ a:hover {
 .container-logs {
     max-height: 400px;
     overflow-y: scroll;
+    white-space: nowrap;
+    margin-bottom: 1rem;
 }
 
 @media (max-width: 900px) {

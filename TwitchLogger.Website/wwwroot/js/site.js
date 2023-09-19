@@ -29,6 +29,18 @@ function getPostRequestOptions(jsonData) {
     };
 }
 
+function formatBytes(bytes, decimals = 2) {
+    if (!+bytes) return '0 Bytes'
+
+    const k = 1024
+    const dm = decimals < 0 ? 0 : decimals
+    const sizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
+}
+
 function confirmObjectDelete(e) {
     e.setAttribute('disabled', '');
 
@@ -53,6 +65,19 @@ function confirmObjectDelete(e) {
 }
 
 (function () {
+    const printSpans = document.querySelectorAll('span[data-print-type]');
+    for (let i = 0; i < printSpans.length; i++) {
+        const span = printSpans[i];
+        const value = span.dataset.value;
+        if (span.dataset.printType == 'date') {
+            span.innerText = new Date(parseInt(value) * 1000).toLocaleString();
+        } else if (span.dataset.printType == 'number') {
+            span.innerText = parseInt(value).toLocaleString();
+        } else if (span.dataset.printType == 'bytes') {
+            span.innerText = formatBytes(value).toLocaleString();
+        }
+    }
+
     const forms = document.querySelectorAll('form');
     Array.prototype.slice.call(forms)
         .forEach(function (form) {

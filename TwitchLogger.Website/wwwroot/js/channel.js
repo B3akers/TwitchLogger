@@ -2,6 +2,10 @@ var channelChatInfo = {
     loaded: false
 };
 
+var userLogsData = {
+
+};
+
 var channelStatsLoaded = false;
 var lastUserLogUrl = '?subtab=userLogs';
 
@@ -40,20 +44,112 @@ function onMessageLogPin(e) {
     const tbody = target.parentElement.parentElement;
     const date = tbody.dataset.date;
 
-    const currentTarget = document.querySelector(`table[data-table-log-date="${date}"] tbody tr.pinned`);
+    const currentTarget = document.querySelector(`div[data-table-log-date="${date}"] div.pinned`);
     if (currentTarget) {
         currentTarget.classList.remove('pinned');
     }
 
     target.parentElement.classList.add('pinned');
 
+    tbody.dataset.pinnedMsgId = target.dataset.msgId;
+
     if (e.isScriptSwitch) {
-        target.scrollIntoView();
+        target.parentElement.parentElement.parentElement.scrollTop = e.scrollToOffset;
     } else {
         const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(tbody.dataset.userLogin)}&userId=${encodeURIComponent(tbody.dataset.userId)}&date=${encodeURIComponent(date)}&msg=${target.dataset.msgId}`;
         window.history.replaceState(null, null, newUrl);
         lastUserLogUrl = newUrl;
     }
+}
+
+function loadMessagesForContainer(container, cursor) {
+    const messages = userLogsData[container.dataset.userId + container.dataset.date];
+    if (!messages)
+        return;
+
+    const messagePixels = 2.5 * parseFloat(getComputedStyle(container).fontSize);
+    const messagePerContainer = (container.parentElement.offsetHeight / messagePixels) + 2;
+    const currentLoadedChildren = container.children.length;
+
+    for (let i = 0; i < messagePerContainer; i++) {
+        const messageIndex = i + cursor;
+        if (messageIndex >= messages.length)
+            return;
+
+        const command = messages[messageIndex];
+
+        const mainMessageDiv = document.createElement('div');
+        mainMessageDiv.style.position = 'absolute';
+        mainMessageDiv.style.left = '0px';
+        mainMessageDiv.style.top = (2.5 * messageIndex) + "rem";
+        mainMessageDiv.style.height = '2.5rem';
+        mainMessageDiv.style.width = "100%";
+        mainMessageDiv.style.padding = '0.2rem';
+
+        const datetimeSpan = document.createElement('span');
+        const mainUserSpan = document.createElement('span');
+        const mainMessageSpan = document.createElement('span');
+
+        datetimeSpan.style.marginRight = '0.5rem';
+        mainUserSpan.style.marginRight = '0.5rem';
+
+        if (channelChatInfo.badges) {
+            for (let y = 0; y < command.badges.length; y++) {
+                const badgePath = command.badges[y].split('/');
+                if (badgePath.length == 2) {
+                    const badgeInfo = channelChatInfo.badges[badgePath[0]]?.[badgePath[1]] ?? null;
+                    if (badgeInfo) {
+                        const img = document.createElement('img');
+                        img.setAttribute('src', badgeInfo.image);
+                        img.setAttribute('alt', command.badges[y]);
+                        img.setAttribute('title', badgeInfo.title);
+                        img.style.marginRight = '5px';
+                        mainUserSpan.appendChild(img);
+                    }
+                }
+            }
+        }
+
+        const span = document.createElement('span');
+        span.style.color = command.color;
+        span.innerText = command.displayName;
+
+        const spanMessage = document.createElement('span');
+        spanMessage.innerText = command.message;
+        if (command.isMeCommand) {
+            spanMessage.style.color = command.color;
+        }
+
+        datetimeSpan.innerText = command.dateStr;
+        datetimeSpan.classList.add('cursor-pointer');
+        datetimeSpan.dataset.msgId = command.messageId;
+        datetimeSpan.addEventListener('click', onMessageLogPin);
+        mainUserSpan.appendChild(span);
+        mainMessageSpan.appendChild(spanMessage);
+
+        mainMessageDiv.appendChild(datetimeSpan);
+        mainMessageDiv.appendChild(mainUserSpan);
+        mainMessageDiv.appendChild(mainMessageSpan);
+
+        if (container.dataset.pinnedMsgId && container.dataset.pinnedMsgId == command.messageId) {
+            mainMessageDiv.classList.add('pinned');
+        }
+
+        if (i < currentLoadedChildren) {
+            container.children[i].replaceWith(mainMessageDiv);
+        } else {
+            container.appendChild(mainMessageDiv);
+        }
+    }
+}
+
+function onLogContainerScroll(e) {
+    const target = e.target;
+    const tbody = target.querySelector('div[data-table-log-date]');
+    const messagePixels = 2.5 * parseFloat(getComputedStyle(tbody).fontSize);
+    const currentIndex = Math.floor(e.target.scrollTop / messagePixels);
+
+    loadMessagesForContainer(tbody, currentIndex);
 }
 
 function loadUserLogs(e) {
@@ -79,26 +175,11 @@ function loadUserLogs(e) {
                 const userLogin = target.dataset.userLogin;
                 const logContainer = document.createElement('div');
                 logContainer.classList.add('container', 'container-logs', 'border');
-                logContainer.innerHTML = `
-                <table data-table-log-date="${logTime}" class="table table-hover table-striped">
-                       <thead>
-                           <tr>
-                               <th scope="col">Date</th>
-                               <th scope="col">User</th>
-                               <th scope="col">Message</th>
-                           </tr>
-                       </thead>
-                       <tbody>
-                       </tbody>
-                </table>`;
+                logContainer.innerHTML = `<div data-table-log-date="${logTime}"></div>`;
                 target.replaceWith(logContainer);
                 dataPromise.then((data) => {
                     const messages = data.split('\r\n');
-                    const tbody = logContainer.querySelector('tbody');
-
-                    tbody.dataset.date = logTime;
-                    tbody.dataset.userId = userId;
-                    tbody.dataset.userLogin = userLogin;
+                    const parsedMessages = [];
 
                     let pinMsg = null;
 
@@ -109,9 +190,9 @@ function loadUserLogs(e) {
                         if (commandArgs.length < 2)
                             continue;
 
-                        if (commandArgs[2] != "PRIVMSG")
+                        if (commandArgs[2] != "PRIVMSG") {
                             continue;
-
+                        }
                         const senderInfos = {};
                         const messageInfos = commandArgs[0].substring(1).split(';');
                         for (let y = 0; y < messageInfos.length; y++) {
@@ -133,62 +214,62 @@ function loadUserLogs(e) {
                         const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toLocaleString();
                         const color = senderInfos["color"] ?? '#FF4500';
 
-                        const tr = document.createElement('tr');
-                        const th = document.createElement('th');
-                        const tdUser = document.createElement('td');
-                        const tdMessage = document.createElement('td');
-
-                        if (channelChatInfo.badges) {
-                            for (let y = 0; y < badges.length; y++) {
-                                const badgePath = badges[y].split('/');
-                                if (badgePath.length == 2) {
-                                    const badgeInfo = channelChatInfo.badges[badgePath[0]]?.[badgePath[1]] ?? null;
-                                    if (badgeInfo) {
-                                        const img = document.createElement('img');
-                                        img.setAttribute('src', badgeInfo.image);
-                                        img.setAttribute('alt', badges[y]);
-                                        img.setAttribute('title', badgeInfo.title);
-                                        img.style.marginRight = '5px';
-                                        tdUser.appendChild(img);
-                                    }
-                                }
-                            }
-                        }
-
-                        const span = document.createElement('span');
-                        span.style.color = color;
-                        span.innerText = senderInfos["display-name"];
-
-                        const spanMessage = document.createElement('span');
-                        spanMessage.innerText = message;
-                        if (isMeCommand) {
-                            spanMessage.style.color = color;
-                        }
-
                         let messageId = senderInfos['id'];
                         if (!messageId) {
                             messageId = senderInfos['tmi-sent-ts'];
                         }
 
-                        th.innerText = dateStr;
-                        th.classList.add('cursor-pointer');
-                        th.dataset.msgId = messageId;
-                        th.addEventListener('click', onMessageLogPin);
-                        tdUser.appendChild(span);
-                        tdMessage.appendChild(spanMessage);
+                        const displayName = senderInfos["display-name"];
 
-                        tr.appendChild(th);
-                        tr.appendChild(tdUser);
-                        tr.appendChild(tdMessage);
-                        tbody.appendChild(tr);
-
-                        if (e.pinMessageAfetrLog && e.pinMessageAfetrLog == th.dataset.msgId) {
-                            pinMsg = th;
+                        if (e.pinMessageAfetrLog && e.pinMessageAfetrLog == messageId) {
+                            pinMsg = {
+                                id: messageId,
+                                index: parsedMessages.length
+                            };
                         }
+
+                        parsedMessages.push({
+                            message: message,
+                            messageId: messageId,
+                            displayName: displayName,
+                            dateStr: dateStr,
+                            color: color,
+                            badges: badges,
+                            isMeCommand: isMeCommand
+                        });
                     }
 
+                    const tbody = logContainer.querySelector('div[data-table-log-date]');
+
+                    tbody.dataset.date = logTime;
+                    tbody.dataset.userId = userId;
+                    tbody.dataset.userLogin = userLogin;
+
+                    tbody.style.position = 'relative';
+                    tbody.style.margin = '10px';
+                    tbody.style.height = (2.5 * parsedMessages.length) + "rem";
+
+                    //Just in case
+                    if ((2.5 * parsedMessages.length)  > 1118000)
+                        tbody.style.height = "1118000rem";
+
+                    userLogsData[userId + logTime] = parsedMessages;
+
+                    logContainer.addEventListener('scroll', onLogContainerScroll);
+
                     if (pinMsg) {
-                        onMessageLogPin({ target: pinMsg, isScriptSwitch: true });
+                        const messagePixels = 2.5 * parseFloat(getComputedStyle(logContainer).fontSize);
+                        const messagePerContainer = (logContainer.offsetHeight / messagePixels);
+                        const maxIndex = parsedMessages.length - messagePerContainer;
+
+                        let pinIndex = pinMsg.index;
+                        if (pinIndex > maxIndex)
+                            pinIndex = maxIndex;
+
+                        loadMessagesForContainer(tbody, pinIndex);
+                        onMessageLogPin({ target: tbody.querySelector(`span[data-msg-id="${pinMsg.id}"]`), isScriptSwitch: true, scrollToOffset: pinIndex * messagePixels });
+                    } else {
+                        loadMessagesForContainer(tbody, 0);
                     }
                 });
             } else if (resp.status == 404) {
@@ -208,6 +289,8 @@ function loadUserLogs(e) {
 function getUserLogsTimesSuccess(json) {
     const container = document.getElementById('userLogsContainer');
     container.innerHTML = '';
+
+    userLogsData = {};
 
     const userLogin = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="text"]').value;
 
@@ -559,17 +642,6 @@ function onTabSwitch(e) {
 }
 
 (function () {
-    const printSpans = document.querySelectorAll('span[data-print-type]');
-    for (let i = 0; i < printSpans.length; i++) {
-        const span = printSpans[i];
-        const value = span.dataset.value;
-        if (span.dataset.printType == 'date') {
-            span.innerText = new Date(parseInt(value) * 1000).toLocaleString();
-        } else if (span.dataset.printType == 'number') {
-            span.innerText = parseInt(value).toLocaleString();
-        }
-    }
-
     const yearSwitchs = document.querySelectorAll('span[data-year-switch]');
     for (let i = 0; i < yearSwitchs.length; i++) {
         const yearSwitch = yearSwitchs[i];

@@ -2,9 +2,36 @@
     ViewData["Title"] = "Home Page";
 }
 
+@model TwitchLogger.Website.Models.HomeIndexViewModel
+
 @section SidebarPanel {
     @await Html.PartialAsync("_ChannelsSideBar")
 }
+
+<div class="container text-center d-flex">
+    <ul class="nav nav-pills w-100 mb-auto d-flex">
+        <li class="nav-item text-center m-3 flex-fill">
+            <h5>Channels count: <span class="text-primary" data-print-type="number" data-value="@Model.ChannelsCount"></span></h5>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <h5>Unique twitch users: <span class="text-primary" data-print-type="number" data-value="@Model.TwitchUniqueUsersCount"></span></h5>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <h5>Messages count: <span class="text-primary" data-print-type="number" data-value="@Model.TotalMessagesCount"></span></h5>
+        </li>
+    </ul>
+</div>
+
+<div class="container text-center d-flex">
+    <ul class="nav nav-pills w-100 mb-auto d-flex">
+        <li class="nav-item text-center m-3 flex-fill">
+            <h5>Storage size: <span class="text-primary" data-print-type="bytes" data-value="@Model.DatabaseSize.Item1"></span></h5>
+        </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <h5>Indexes size: <span class="text-primary" data-print-type="bytes" data-value="@Model.DatabaseSize.Item2"></span></h5>
+        </li>
+    </ul>
+</div>
 
 @section Scripts {
     <script>

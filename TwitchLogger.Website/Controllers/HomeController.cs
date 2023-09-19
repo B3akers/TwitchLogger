@@ -5,6 +5,7 @@ using System.Diagnostics;
 using TwitchLogger.SimpleGraphQL;
 using TwitchLogger.Website.Interfaces;
 using TwitchLogger.Website.Models;
+using TwitchLogger.Website.Services;
 
 namespace TwitchLogger.Website.Controllers
 {
@@ -14,23 +15,42 @@ namespace TwitchLogger.Website.Controllers
         private readonly IChannelStatsRepository _channelStatsRepository;
         private readonly ITwitchAccountRepository _twitchAccountRepository;
         private readonly IMemoryCache _memoryCache;
+        private readonly DatabaseService _databaseService;
         private readonly string _dataLogDirectory;
 
-        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache)
+        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache, DatabaseService databaseService)
         {
             _dataLogDirectory = configuration["Logs:DataLogDirectory"];
             _channelRepository = channelRepository;
             _channelStatsRepository = channelStatsRepository;
             _twitchAccountRepository = twitchAccountRepository;
             _memoryCache = memoryCache;
+            _databaseService = databaseService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var model = new HomeIndexViewModel();
+            model.ChannelsCount = await _channelRepository.GetEstimatedCount();
+            model.TwitchUniqueUsersCount = await _twitchAccountRepository.GetEstimatedUniqueCount();
+
+            model.TotalMessagesCount = await _memoryCache.GetOrCreateAsync("totalMessagesChannels", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
+                return await _channelRepository.GetAllMessagesCount();
+            });
+
+            model.DatabaseSize = await _memoryCache.GetOrCreateAsync("databaseStats", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                return await _databaseService.GetDatabaseStats();
+            });
+
+            return View(model);
         }
 
         [Route("Home/Channel/{id?}")]
+        [Route("Channel/{id?}")]
         public async Task<IActionResult> Channel(string id)
         {
             var channel = await _channelRepository.GetChannelByUserId(id);
@@ -90,7 +110,7 @@ namespace TwitchLogger.Website.Controllers
 
             var data = await _channelStatsRepository.GetTopChatters(model.Id, model.Year);
             var userData = await _twitchAccountRepository.GetTwitchAccounts(data.Select(x => x.UserId));
-          
+
             return Json(new { data, userData });
         }
 
@@ -218,7 +238,7 @@ namespace TwitchLogger.Website.Controllers
 
             var channelLogin = channel.Login;
 
-            return await _memoryCache.GetOrCreateAsync(channelLogin, async entry =>
+            return await _memoryCache.GetOrCreateAsync($"badges_{channelLogin}", async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
                 var result = await TwitchGraphQL.GetChannelBadgesInfo(channelLogin);

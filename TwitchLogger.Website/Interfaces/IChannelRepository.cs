@@ -10,5 +10,7 @@ namespace TwitchLogger.Website.Interfaces
         public Task<ChannelDTO> GetChannelByUserId(string userId);
         public Task DeleteChannel(string channelId);
         public Task UpdateChannels();
+        public Task<long> GetEstimatedCount();
+        public Task<long> GetAllMessagesCount();
     }
 }

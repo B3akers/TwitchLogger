@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using System.Collections.Concurrent;
 using TwitchLogger.DTO;
 
@@ -19,7 +20,7 @@ namespace TwitchLogger.Website.Services
         private readonly IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
         private readonly IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
         private readonly IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
-        
+
         public DatabaseService(IConfiguration configuration)
         {
             _client = new MongoClient(configuration["Mongo:ConnectionString"]);
@@ -95,6 +96,13 @@ namespace TwitchLogger.Website.Services
         public IMongoCollection<TwitchWordStatDTO> GetTwitchWordStatCollection()
         {
             return _twitchWordStatCollection;
+        }
+
+        public async Task<Tuple<long, long>> GetDatabaseStats()
+        {
+            var result = await _mongoDatabase.RunCommandAsync<BsonDocument>(new BsonDocument("dbStats", 1));
+
+            return new Tuple<long, long>((long)(double)result["storageSize"], (long)(double)result["indexSize"]);
         }
     }
 }

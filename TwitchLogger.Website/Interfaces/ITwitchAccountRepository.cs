@@ -6,5 +6,6 @@ namespace TwitchLogger.Website.Interfaces
     {
         public Task<IEnumerable<TwitchAccountDTO>> GetTwitchAccounts(IEnumerable<string> userIds);
         public Task<TwitchAccountDTO> GetTwitchAccountByLogin(string login);
+        public Task<long> GetEstimatedUniqueCount();
     }
 }
