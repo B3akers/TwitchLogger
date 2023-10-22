@@ -46,6 +46,9 @@ namespace TwitchLogger.Website.Controllers
                 return await _databaseService.GetDatabaseStats();
             });
 
+            if (model.DatabaseSize == null)
+                model.DatabaseSize = new Tuple<long, long>(0, 0);
+
             return View(model);
         }
 
@@ -248,7 +251,7 @@ namespace TwitchLogger.Website.Controllers
 
             try
             {
-               return await GetLogs(model.Id, "channel", date.ToString("yyyy"), date.ToString("MM"), date.ToString("dd"));
+                return await GetLogs(model.Id, "channel", date.ToString("yyyy"), date.ToString("MM"), date.ToString("dd"));
             }
             catch { }
 
