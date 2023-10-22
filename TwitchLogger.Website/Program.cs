@@ -26,9 +26,11 @@ builder.Services.AddSingleton<IUserAuthentication, UserAuthenticationService>();
 builder.Services.AddSingleton<IChannelRepository, ChannelRepositoryService>();
 builder.Services.AddSingleton<IChannelStatsRepository, ChannelStatsRepositoryService>();
 builder.Services.AddSingleton<ITwitchAccountRepository, TwitchAccountRepositoryService>();
+builder.Services.AddSingleton<IChannelLiveStats, ChannelLiveStatsService>();
 
 builder.Services.AddHostedService<ConfigureMongoDbService>();
 builder.Services.AddHostedService<ChannelUpdateService>();
+builder.Services.AddHostedService<LivetimeServerPipeService>();
 
 var app = builder.Build();
 

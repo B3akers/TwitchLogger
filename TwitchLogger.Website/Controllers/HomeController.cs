@@ -68,14 +68,10 @@ namespace TwitchLogger.Website.Controllers
             if (!ModelState.IsValid)
                 return Json(new { error = "invalid_model" });
 
-            if (!model.User.All(char.IsDigit))
-            {
-                var user = await _twitchAccountRepository.GetTwitchAccountByLogin(model.User);
-                if (user == null)
-                    return Json(new { error = "user_not_found" });
+            model.User = await _twitchAccountRepository.GetUserIdFromParam(model.User);
 
-                model.User = user.UserId;
-            }
+            if (string.IsNullOrEmpty(model.User))
+                return Json(new { error = "user_not_found" });
 
             var result = await _channelStatsRepository.GetUserMessageTime(model.Id, model.User);
 
@@ -88,14 +84,10 @@ namespace TwitchLogger.Website.Controllers
             if (!ModelState.IsValid)
                 return Json(new { error = "invalid_model" });
 
-            if (!model.User.All(char.IsDigit))
-            {
-                var user = await _twitchAccountRepository.GetTwitchAccountByLogin(model.User);
-                if (user == null)
-                    return Json(new { error = "user_not_found" });
+            model.User = await _twitchAccountRepository.GetUserIdFromParam(model.User);
 
-                model.User = user.UserId;
-            }
+            if (string.IsNullOrEmpty(model.User))
+                return Json(new { error = "user_not_found" });
 
             var data = await _channelStatsRepository.GetTopUserWords(model.Id, model.User, model.Year);
 
@@ -247,19 +239,30 @@ namespace TwitchLogger.Website.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> GetChannelLogs([FromBody] GetChannelLogsModel model)
+        {
+            if (string.IsNullOrEmpty(model.Id))
+                return NotFound();
+
+            var date = DateTimeOffset.FromUnixTimeSeconds(model.Date);
+
+            try
+            {
+               return await GetLogs(model.Id, "channel", date.ToString("yyyy"), date.ToString("MM"), date.ToString("dd"));
+            }
+            catch { }
+
+            return NotFound();
+        }
+
+        [HttpPost]
         public async Task<IActionResult> GetUserLogs([FromBody] GetUserLogsModel model)
         {
             if (string.IsNullOrEmpty(model.Id))
                 return NotFound();
 
-            if (!model.User.All(char.IsDigit))
-            {
-                var user = await _twitchAccountRepository.GetTwitchAccountByLogin(model.User);
-                if (user == null)
-                    return NotFound();
-
-                model.User = user.UserId;
-            }
+            if (string.IsNullOrEmpty(model.User))
+                return NotFound();
 
             try
             {

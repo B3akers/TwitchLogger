@@ -46,6 +46,11 @@
                 Channel stats
             </span>
         </li>
+        <li class="nav-item text-center m-3 flex-fill d-none">
+            <span data-subtab="liveStats" class="nav-link cursor-pointer">
+                Live stats
+            </span>
+        </li>
         <li class="nav-item text-center m-3 flex-fill">
             <span data-subtab="wordUsers" class="nav-link cursor-pointer">
                 Top users(word)
@@ -61,11 +66,16 @@
                 User logs
             </span>
         </li>
+        <li class="nav-item text-center m-3 flex-fill">
+            <span data-subtab="channelLogs" class="nav-link cursor-pointer">
+                Channel logs
+            </span>
+        </li>
     </ul>
     <hr />
 </div>
 
-<div data-subtab="channelStats" class="container">
+<div data-subtab="channelStats" class="container d-none">
     <div class="container text-center d-flex">
         <ul class="nav nav-pills w-100 mb-auto d-flex">
             <li class="nav-item text-center m-3 flex-fill">
@@ -216,12 +226,52 @@
     </div>
 </div>
 
+<div data-subtab="channelLogs" class="container d-none">
+    <div id="channelLogsTab1" class="text-center">
+        Loading...
+    </div>
+
+    <div id="channelLogsTab2" class="d-none">
+        <form class="p-2" data-url="@Url.Action("GetChannelLogs","Home")" data-raw="true" data-callback="getChannelLogsSuccess">
+            <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+            <div class="mb-1">
+                <label>Date</label>
+                <input data-form-name="date" data-form-type="date" type="date" class="form-control" required="">
+            </div>
+            <div class="mb-1">
+                <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+            </div>
+        </form>
+        <div class="container text-center">
+            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#channelLogFilters" aria-expanded="false" aria-controls="channelLogFilters">
+                Toogle filters
+            </button>
+            <div class="collapse m-2" id="channelLogFilters">
+                <div class="mb-1">
+                    <label>Users</label>
+                    <textarea class="form-control" rows="2"></textarea>
+                </div>
+                <div class="mb-1">
+                    <button class="btn btn-primary" type="button" onclick="applyChannelLogsFilters()">
+                        Apply filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        <hr />
+        <div class="container" id="channelLogsContainer">
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
         const getUserLogsUrl = '@Url.Action("GetUserLogs", "Home")';
         const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
         const getChannelBadgesUrl = '@Url.Action("GetChannelBadges", "Home", new { channelId = Model.Channel.UserId})';
+        const channelId = '@Model.Channel.UserId';
+        const channelLogin = '@Model.Channel.Login';
     </script>
 
     <script src="~/js/home.js"></script>

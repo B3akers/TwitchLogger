@@ -6,8 +6,13 @@ var userLogsData = {
 
 };
 
+var userLogsDataIndexes = {
+
+};
+
 var channelStatsLoaded = false;
 var lastUserLogUrl = '?subtab=userLogs';
+var lastChannelLogUrl = '?subtab=channelLogs';
 
 function getTopUserWordsSuccess(json) {
     const form = document.querySelector('form[data-callback="getTopUserWordsSuccess"]');
@@ -56,9 +61,16 @@ function onMessageLogPin(e) {
     if (e.isScriptSwitch) {
         target.parentElement.parentElement.parentElement.scrollTop = e.scrollToOffset;
     } else {
-        const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(tbody.dataset.userLogin)}&userId=${encodeURIComponent(tbody.dataset.userId)}&date=${encodeURIComponent(date)}&msg=${target.dataset.msgId}`;
-        window.history.replaceState(null, null, newUrl);
-        lastUserLogUrl = newUrl;
+
+        var url = new URL(window.location);
+        url.searchParams.set('msg', target.dataset.msgId);
+        window.history.replaceState(null, null, url);
+
+        if (date == 'channel') {
+            lastChannelLogUrl = url.toString();
+        } else {
+            lastUserLogUrl = url.toString();
+        }
     }
 }
 
@@ -67,16 +79,27 @@ function loadMessagesForContainer(container, cursor) {
     if (!messages)
         return;
 
+    if (cursor == 0) {
+        container.parentElement.scrollTop = 0;
+    }
+
+    const indexes = userLogsDataIndexes[container.dataset.userId + container.dataset.date];
+    const messageLength = indexes ? indexes.length : messages.length;
+
     const messagePixels = 2.5 * parseFloat(getComputedStyle(container).fontSize);
     const messagePerContainer = (container.parentElement.offsetHeight / messagePixels) + 2;
     const currentLoadedChildren = container.children.length;
 
     for (let i = 0; i < messagePerContainer; i++) {
         const messageIndex = i + cursor;
-        if (messageIndex >= messages.length)
+        if (messageIndex >= messageLength) {
+            for (let y = i; y < container.children.length; y++) {
+                container.children[y].remove();
+            }
             return;
+        }
 
-        const command = messages[messageIndex];
+        const command = messages[indexes ? indexes[messageIndex] : messageIndex];
 
         const mainMessageDiv = document.createElement('div');
         mainMessageDiv.style.position = 'absolute';
@@ -143,6 +166,73 @@ function loadMessagesForContainer(container, cursor) {
     }
 }
 
+function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
+    const messages = data.split('\r\n');
+    const parsedMessages = [];
+
+    let pinMsg = null;
+
+    for (let i = 0; i < messages.length; i++) {
+        const command = isChannelLog ? messages[i] : messages[messages.length - i - 1];
+        const commandArgs = command.split(' ');
+
+        if (commandArgs.length < 2)
+            continue;
+
+        if (commandArgs[2] != "PRIVMSG") {
+            continue;
+        }
+        const senderInfos = {};
+        const messageInfos = commandArgs[0].substring(1).split(';');
+        for (let y = 0; y < messageInfos.length; y++) {
+            const splitInfo = messageInfos[y].split('=');
+
+            senderInfos[splitInfo[0]] = splitInfo[1];
+        }
+
+        let isMeCommand = false;
+        let message = commandArgs.length > 4 ? commandArgs.slice(4).join(' ').substring(1) : "";
+        if (message.length > 0 && message.charCodeAt(0) == 1) {
+            const msgStartIndex = message.indexOf(' ');
+            if (msgStartIndex != -1)
+                message = message.substring(msgStartIndex + 1, message.length - 1);
+            isMeCommand = true;
+        }
+
+        const badges = senderInfos["badges"].split(',');
+        const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toLocaleString();
+        const color = senderInfos["color"] ?? '#FF4500';
+
+        let messageId = senderInfos['id'];
+        if (!messageId) {
+            messageId = senderInfos['tmi-sent-ts'];
+        }
+
+        const displayName = senderInfos["display-name"];
+
+        if (pinMessageId && pinMessageId == messageId) {
+            pinMsg = {
+                id: messageId,
+                index: parsedMessages.length
+            };
+        }
+
+        parsedMessages.push({
+            message: message,
+            messageId: messageId,
+            displayName: displayName,
+            dateStr: dateStr,
+            color: color,
+            badges: badges,
+            isMeCommand: isMeCommand
+        });
+    }
+
+    return {
+        parsedMessages: parsedMessages,
+        pinMsg: pinMsg
+    };
+}
 function onLogContainerScroll(e) {
     const target = e.target;
     const tbody = target.querySelector('div[data-table-log-date]');
@@ -150,6 +240,191 @@ function onLogContainerScroll(e) {
     const currentIndex = Math.floor(e.target.scrollTop / messagePixels);
 
     loadMessagesForContainer(tbody, currentIndex);
+}
+
+function applyIndexesForLogs(mainContainer, userId, logTime) {
+    const tbody = mainContainer.querySelector('div[data-table-log-date]');
+    const indexArray = userLogsDataIndexes[userId + logTime];
+
+    const messageLength = indexArray ? indexArray.length : messages.length;
+    tbody.style.height = (2.5 * messageLength) + "rem";
+    tbody.innerHTML = '';
+    loadMessagesForContainer(tbody, 0);
+}
+
+function createIndexesForLogs(userId, logTime, filters) {
+    const messages = userLogsData[userId + logTime];
+    if (!messages)
+        return;
+
+    let indexArray = [];
+
+    if (filters.length > 0) {
+        for (let i = 0; i < messages.length; i++) {
+            const message = messages[i];
+
+            let passed = false;
+
+            for (let y = 0; y < filters.length; y++) {
+                const filter = filters[y];
+                if (filter.type == 'userName') {
+                    for (let y1 = 0; y1 < filter.value.length; y1++) {
+                        if (message.displayName.localeCompare(filter.value[y1]) == 0) {
+                            passed = true;
+                            break;
+                        }
+                    }
+
+                }
+
+                if (passed)
+                    break;
+            }
+
+            if (passed)
+                indexArray.push(i);
+        }
+
+        if (indexArray.length == messages.length)
+            indexArray = null;
+    } else {
+        indexArray = null;
+    }
+
+    userLogsDataIndexes[userId + logTime] = indexArray;
+}
+
+function getFiltersForChannelLogs() {
+    const filtersContainer = document.getElementById('channelLogFilters');
+    const users = filtersContainer.querySelector('textarea').value.split('\n').reduce(function (result, element) {
+        let value = element.trim();
+        if (value)
+            result.push(value);
+        return result;
+    }, []);
+
+    const filters = [];
+
+    if (users.length > 0) {
+        filters.push({
+            type: 'userName',
+            value: users
+        });
+    }
+
+    return filters;
+}
+
+function applyChannelLogsFilters() {
+    const filters = getFiltersForChannelLogs();
+
+    const mainContainer = document.getElementById('channelLogsContainer');
+    const tbody = mainContainer.querySelector('div[data-table-log-date]');
+
+    let filterParam = '';
+    if (filters.length > 0) {
+        for (let i = 0; i < filters.length; i++) {
+            const filter = filters[i];
+            if (filter.type == 'userName') {
+                filterParam = '&filterUser=' + encodeURIComponent(filter.value.join(','));
+            }
+        }
+    }
+
+    const newUrl = `?subtab=channelLogs&date=${encodeURIComponent(tbody.dataset.channelLogDate)}${filterParam}`;
+    window.history.replaceState(null, null, newUrl);
+    lastChannelLogUrl = newUrl;
+
+    createIndexesForLogs(channelId, 'channel', filters);
+    applyIndexesForLogs(mainContainer, channelId, 'channel');
+}
+
+function createLogsForData(logContainer, data, userId, userLogin, logTime, pinMessageId, filters) {
+    const messagesInfo = parseMessagesFromRaw(data, pinMessageId, logTime == 'channel');
+
+    const parsedMessages = messagesInfo.parsedMessages;
+    const pinMsg = messagesInfo.pinMsg;
+
+    const tbody = logContainer.querySelector('div[data-table-log-date]');
+
+    userLogsData[userId + logTime] = parsedMessages;
+    createIndexesForLogs(userId, logTime, filters ?? []);
+
+    const indexes = userLogsDataIndexes[userId + logTime];
+    const messageLength = indexes ? indexes.length : parsedMessages.length;
+
+    tbody.dataset.date = logTime;
+    tbody.dataset.userId = userId;
+    tbody.dataset.userLogin = userLogin;
+
+    tbody.style.position = 'relative';
+    tbody.style.margin = '10px';
+    tbody.style.height = (2.5 * messageLength) + "rem";
+
+    //Just in case
+    if ((2.5 * messageLength) > 1118000)
+        tbody.style.height = "1118000rem";
+
+    logContainer.addEventListener('scroll', onLogContainerScroll);
+
+    if (pinMsg) {
+        let pinIndex = pinMsg.index;
+        let foundPinMsg = true;
+        if (indexes) {
+            foundPinMsg = false;
+            for (let i = 0; i < indexes.length; i++) {
+                if (indexes[i] == pinIndex) {
+                    pinIndex = i;
+                    foundPinMsg = true;
+                    break;
+                }
+            }
+        }
+
+        if (foundPinMsg) {
+            const messagePixels = 2.5 * parseFloat(getComputedStyle(logContainer).fontSize);
+            const messagePerContainer = (logContainer.offsetHeight / messagePixels);
+            const maxIndex = messagePerContainer > messageLength ? 0 : (messageLength - messagePerContainer);
+
+            if (pinIndex > maxIndex)
+                pinIndex = maxIndex;
+
+            loadMessagesForContainer(tbody, pinIndex);
+            onMessageLogPin({ target: tbody.querySelector(`span[data-msg-id="${pinMsg.id}"]`), isScriptSwitch: true, scrollToOffset: pinIndex * messagePixels });
+        } else {
+            loadMessagesForContainer(tbody, 0);
+            tbody.dataset.pinnedMsgId = pinMsg.id;
+        }
+    } else {
+        loadMessagesForContainer(tbody, 0);
+    }
+}
+
+function getChannelLogsSuccess(data) {
+    const mainContainer = document.getElementById('channelLogsContainer');
+    mainContainer.innerHTML = '';
+
+    let filters = [];
+
+    const dateInput = document.getElementById('channelLogsTab2').querySelector('form input[type="date"]');
+    if (!dateInput.dataset.isScriptSwitch) {
+        const newUrl = `?subtab=channelLogs&date=${encodeURIComponent(dateInput.value)}`;
+        window.history.replaceState(null, null, newUrl);
+        lastChannelLogUrl = newUrl;
+    } else {
+        delete dateInput.dataset.isScriptSwitch;
+        filters = getFiltersForChannelLogs();
+    }
+    
+    const logContainer = document.createElement('div');
+    logContainer.classList.add('container', 'container-logs', 'border');
+    logContainer.innerHTML = `<div data-table-log-date="channel"></div>`;
+
+    mainContainer.appendChild(logContainer);
+
+    logContainer.querySelector('div[data-table-log-date]').dataset.channelLogDate = dateInput.value;
+
+    createLogsForData(logContainer, data, channelId, channelLogin, 'channel', dateInput.dataset.msg, filters);
 }
 
 function loadUserLogs(e) {
@@ -173,104 +448,14 @@ function loadUserLogs(e) {
                 const logTime = target.dataset.time;
                 const userId = target.dataset.userId;
                 const userLogin = target.dataset.userLogin;
+
                 const logContainer = document.createElement('div');
                 logContainer.classList.add('container', 'container-logs', 'border');
                 logContainer.innerHTML = `<div data-table-log-date="${logTime}"></div>`;
                 target.replaceWith(logContainer);
+
                 dataPromise.then((data) => {
-                    const messages = data.split('\r\n');
-                    const parsedMessages = [];
-
-                    let pinMsg = null;
-
-                    for (let i = (messages.length - 1); i >= 0; i--) {
-                        const command = messages[i];
-                        const commandArgs = command.split(' ');
-
-                        if (commandArgs.length < 2)
-                            continue;
-
-                        if (commandArgs[2] != "PRIVMSG") {
-                            continue;
-                        }
-                        const senderInfos = {};
-                        const messageInfos = commandArgs[0].substring(1).split(';');
-                        for (let y = 0; y < messageInfos.length; y++) {
-                            const splitInfo = messageInfos[y].split('=');
-
-                            senderInfos[splitInfo[0]] = splitInfo[1];
-                        }
-
-                        let isMeCommand = false;
-                        let message = commandArgs.length > 4 ? commandArgs.slice(4).join(' ').substring(1) : "";
-                        if (message.length > 0 && message.charCodeAt(0) == 1) {
-                            const msgStartIndex = message.indexOf(' ');
-                            if (msgStartIndex != -1)
-                                message = message.substring(msgStartIndex + 1, message.length - 1);
-                            isMeCommand = true;
-                        }
-
-                        const badges = senderInfos["badges"].split(',');
-                        const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toLocaleString();
-                        const color = senderInfos["color"] ?? '#FF4500';
-
-                        let messageId = senderInfos['id'];
-                        if (!messageId) {
-                            messageId = senderInfos['tmi-sent-ts'];
-                        }
-
-                        const displayName = senderInfos["display-name"];
-
-                        if (e.pinMessageAfetrLog && e.pinMessageAfetrLog == messageId) {
-                            pinMsg = {
-                                id: messageId,
-                                index: parsedMessages.length
-                            };
-                        }
-
-                        parsedMessages.push({
-                            message: message,
-                            messageId: messageId,
-                            displayName: displayName,
-                            dateStr: dateStr,
-                            color: color,
-                            badges: badges,
-                            isMeCommand: isMeCommand
-                        });
-                    }
-
-                    const tbody = logContainer.querySelector('div[data-table-log-date]');
-
-                    tbody.dataset.date = logTime;
-                    tbody.dataset.userId = userId;
-                    tbody.dataset.userLogin = userLogin;
-
-                    tbody.style.position = 'relative';
-                    tbody.style.margin = '10px';
-                    tbody.style.height = (2.5 * parsedMessages.length) + "rem";
-
-                    //Just in case
-                    if ((2.5 * parsedMessages.length)  > 1118000)
-                        tbody.style.height = "1118000rem";
-
-                    userLogsData[userId + logTime] = parsedMessages;
-
-                    logContainer.addEventListener('scroll', onLogContainerScroll);
-
-                    if (pinMsg) {
-                        const messagePixels = 2.5 * parseFloat(getComputedStyle(logContainer).fontSize);
-                        const messagePerContainer = (logContainer.offsetHeight / messagePixels);
-                        const maxIndex = parsedMessages.length - messagePerContainer;
-
-                        let pinIndex = pinMsg.index;
-                        if (pinIndex > maxIndex)
-                            pinIndex = maxIndex;
-
-                        loadMessagesForContainer(tbody, pinIndex);
-                        onMessageLogPin({ target: tbody.querySelector(`span[data-msg-id="${pinMsg.id}"]`), isScriptSwitch: true, scrollToOffset: pinIndex * messagePixels });
-                    } else {
-                        loadMessagesForContainer(tbody, 0);
-                    }
+                    createLogsForData(logContainer, data, userId, userLogin, logTime, e.pinMessageAfetrLog, null);
                 });
             } else if (resp.status == 404) {
                 toastr.error(translateCode('not_found'));
@@ -290,7 +475,14 @@ function getUserLogsTimesSuccess(json) {
     const container = document.getElementById('userLogsContainer');
     container.innerHTML = '';
 
-    userLogsData = {};
+    const keys = Object.keys(userLogsData);
+    for (let i = 0; i < keys.length; i++) {
+        if (keys[i].endsWith('channel')) {
+            continue;
+        }
+
+        delete userLogsData[keys[i]];
+    }
 
     const userLogin = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="text"]').value;
 
@@ -399,12 +591,7 @@ function getTopWordsSuccess(json) {
     const form = document.querySelector('form[data-callback="getTopWordsSuccess"]');
     const year = form.querySelector('input[data-form-name="year"]').value;
 
-    if (year != '0') {
-        window.history.replaceState(null, null, `?subtab=channelStats&year=${encodeURIComponent(year)}`);
-    }
-    else {
-        window.history.replaceState(null, null, window.location.pathname);
-    }
+    window.history.replaceState(null, null, `?subtab=channelStats&year=${encodeURIComponent(year)}`);
 
     const tbody = document.getElementById('tableWords').querySelector('tbody');
     tbody.innerHTML = '';
@@ -530,7 +717,10 @@ function onTabSwitch(e) {
             }
         } else if (subTabName == 'userLogs') {
             newUrl = lastUserLogUrl;
+        } else if (subTabName == 'channelLogs') {
+            newUrl = lastChannelLogUrl;
         }
+
         window.history.replaceState(null, null, newUrl);
     }
 
@@ -549,7 +739,7 @@ function onTabSwitch(e) {
             onYearSwitch({ target: currentYearSwitch });
 
         }
-    } else if (subTabName == 'userLogs') {
+    } else if (subTabName == 'userLogs' || subTabName == 'channelLogs') {
         if (!channelChatInfo.loaded) {
             channelChatInfo.loaded = true;
 
@@ -602,7 +792,37 @@ function onTabSwitch(e) {
                     document.getElementById('userLogsTab1').classList.add('d-none');
                     document.getElementById('userLogsTab2').classList.remove('d-none');
 
-                    if (e.isScriptSwitch && subTabName == 'userLogs') {
+                    document.getElementById('channelLogsTab1').classList.add('d-none');
+                    document.getElementById('channelLogsTab2').classList.remove('d-none');
+
+                    if (e.isScriptSwitch && subTabName == 'channelLogs') {
+                        const url = new URL(window.location.href);
+                        lastChannelLogUrl = '?' + url.searchParams.toString();
+
+                        const logTime = url.searchParams.get('date');
+                        const msg = url.searchParams.get('msg');
+                        if (logTime) {
+                            const logTimeInput = document.querySelector('form[data-callback="getChannelLogsSuccess"] input[type="date"]');
+                            if (logTimeInput) {
+                                logTimeInput.dataset.isScriptSwitch = 'true';
+                                logTimeInput.value = logTime;
+                                if (msg) {
+                                    logTimeInput.dataset.msg = msg;
+                                }
+                            }
+                        }
+
+                        const filtersContainer = document.getElementById('channelLogFilters');
+
+                        const filterUser = url.searchParams.get('filterUser');
+                        if (filterUser) {
+                            filtersContainer.querySelector('textarea').value = filterUser.split(',').join('\n');
+                        }
+
+                        const form = document.querySelector('form[data-callback="getChannelLogsSuccess"]');
+                        form.requestSubmit(form.querySelector('button[type="submit"]'));
+
+                    } else if (e.isScriptSwitch && subTabName == 'userLogs') {
                         const url = new URL(window.location.href);
 
                         lastUserLogUrl = '?' + url.searchParams.toString();

@@ -3,6 +3,8 @@ using MongoDB.Driver.Core.Bindings;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.IO.Pipes;
+using System.Text;
 using System.Threading.Channels;
 using TwitchLogger.ChatBot;
 using TwitchLogger.ChatBot.TwitchIrcClient;
@@ -14,6 +16,9 @@ class Program
     private static CancellationTokenSource cancellationToken;
     private static TwitchIrcBot ircBot;
     private static MongoClient _client;
+
+    private static NamedPipeClientStream _clientPipeStream;
+    private static SemaphoreSlim _clientPipeCreationLock = new SemaphoreSlim(1, 1);
 
     private static IMongoCollection<ChannelDTO> _channelsCollection;
     private static IMongoCollection<TwitchAccountDTO> _twitchAccountsCollection;
@@ -116,10 +121,13 @@ class Program
                 await _twitchAccountsCollection.UpdateOneAsync(x => x.UserId == userId && x.Login == userLogin, Builders<TwitchAccountDTO>.Update.Set(x => x.DisplayName, userDisplayname).SetOnInsert(x => x.RecordInsertTime, unixCurrentDate), new UpdateOptions() { IsUpsert = true });
             }
 
+            var messageObject = new JObject();
+
             if (args.MessageType == TwitchChatMessageType.PRIVMSG)
             {
                 var roomId = args.SenderInfo["room-id"];
                 var userId = args.SenderInfo["user-id"];
+                var userDisplayname = args.SenderInfo["display-name"];
 
                 await _twitchUsersMessageTimeCollection.UpdateOneAsync(x => x.UserId == userId && x.RoomId == roomId, Builders<TwitchUserMessageTime>.Update.AddToSet(x => x.MessageTimes, currentDate.ToString("yyyy-MM")), new UpdateOptions() { IsUpsert = true });
                 await _channelsCollection.UpdateOneAsync(x => x.UserId == roomId, Builders<ChannelDTO>.Update.Set(x => x.MessageLastDate, unixCurrentDate).Inc(x => x.MessageCount, 1ul));
@@ -132,6 +140,13 @@ class Program
                 var filterWordStat = Builders<TwitchWordStatDTO>.Filter;
                 var filterUserStat = Builders<TwitchUserStatDTO>.Filter;
                 var year = int.Parse(currentDate.ToString("yyyy"));
+
+                messageObject["type"] = "PRIVMSG";
+                messageObject["roomId"] = roomId;
+                messageObject["user"] = userDisplayname;
+                messageObject["timestamp"] = unixCurrentDate;
+                messageObject["message"] = args.Message;
+                messageObject["words"] = JArray.FromObject(wordsMessage);
 
                 foreach (var word in wordsMessage)
                 {
@@ -203,6 +218,48 @@ class Program
                         int.TryParse(monthsStr ?? "1", out int months);
 
                         await _twitchUserSubscriptionCollection.InsertOneAsync(new TwitchUserSubscriptionDTO() { RoomId = roomId, UserId = userId, RecipientUserId = recipientId, SubPlan = subPlan ?? "", SubMessage = args.Message, CumulativeMonths = months, Timestamp = unixCurrentDate });
+                    }
+                }
+            }
+
+            if (messageObject.HasValues)
+            {
+                if (_clientPipeStream == null)
+                {
+                    await _clientPipeCreationLock.WaitAsync();
+                    if (_clientPipeStream == null)
+                    {
+                        try
+                        {
+                            _clientPipeStream = new NamedPipeClientStream("TwitchLogger.NamedPipe");
+                            await _clientPipeStream.ConnectAsync(1);
+                        }
+                        catch
+                        {
+                            await _clientPipeStream.DisposeAsync();
+                            _clientPipeStream = null;
+                        }
+                    }
+                    _clientPipeCreationLock.Release();
+                }
+
+                if (_clientPipeStream != null)
+                {
+                    try
+                    {
+                        await _clientPipeStream.WriteAsync(Encoding.UTF8.GetBytes(Convert.ToBase64String(Encoding.UTF8.GetBytes(messageObject.ToString(Newtonsoft.Json.Formatting.None))) + "\r\n"));
+                    }
+                    catch
+                    {
+                        await _clientPipeCreationLock.WaitAsync();
+
+                        if (_clientPipeStream != null)
+                        {
+                            await _clientPipeStream.DisposeAsync();
+                            _clientPipeStream = null;
+                        }
+
+                        _clientPipeCreationLock.Release();
                     }
                 }
             }

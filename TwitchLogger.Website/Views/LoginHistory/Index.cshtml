@@ -1,0 +1,31 @@
+﻿@{
+    ViewData["Title"] = "Login History Page";
+}
+
+<div class="container text-center d-grid align-content-center">
+    <form class="p-2" data-url="@Url.Action("GetHistory","LoginHistory")" data-callback="getHistorySuccess">
+        <div class="mb-1">
+            <label>User</label>
+            <input data-form-name="user" type="text" class="form-control" required="">
+        </div>
+        <div class="mb-1">
+            <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+        </div>
+    </form>
+    <hr />
+    <table id="loginHistoryTable" class="table table-hover border-primary table-bordered table-striped">
+        <thead>
+            <tr>
+                <th scope="col">Date</th>
+                <th scope="col">From</th>
+                <th scope="col">To</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script src="~/js/login-history.js"></script>
+}
