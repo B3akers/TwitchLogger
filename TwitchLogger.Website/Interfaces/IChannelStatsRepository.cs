@@ -8,6 +8,7 @@ namespace TwitchLogger.Website.Interfaces
         public Task<IEnumerable<TwitchWordUserStatDTO>> GetTopUserWords(string channelId, string user, int year = 0, int limit = 25);
         public Task<IEnumerable<TwitchWordStatDTO>> GetTopWords(string channelId, int year = 0, int limit = 100);
         public Task<IEnumerable<TwitchUserStatDTO>> GetTopChatters(string channelId, int year = 0, int limit = 100);
-        public Task<TwitchUserMessageTime> GetUserMessageTime(string channelId, string user); 
+        public Task<TwitchUserMessageTime> GetUserMessageTime(string channelId, string user);
+        public Task<List<Tuple<string, int>>> GetUniqueSubscriptions(string channelId, long from, long to);
     }
 }

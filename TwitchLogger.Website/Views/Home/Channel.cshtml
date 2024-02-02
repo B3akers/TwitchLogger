@@ -90,6 +90,29 @@
         </ul>
     </div>
     <hr />
+    <div class="text-center">
+        <h4>Active subscribers</h4>
+        <div class="container text-center d-flex">
+            <table class="table table-hover border-primary table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Plan</th>
+                        <th scope="col">Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Subscriptions.Count; i++)
+                    {
+                        <tr>
+                            <td><span data-print-type="subTier" data-value="@Model.Subscriptions[i].Item1"></span></td>
+                            <td><span data-print-type="number" data-value="@Model.Subscriptions[i].Item2"></span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <hr />
     @{
         MakeYearSwitch("channelStats");
     }
@@ -252,6 +275,10 @@
                     <textarea class="form-control" rows="2"></textarea>
                 </div>
                 <div class="mb-1">
+                    <label>Content</label>
+                    <input type="text" class="form-control"></input>
+                </div>
+                <div class="mb-1">
                     <button class="btn btn-primary" type="button" onclick="applyChannelLogsFilters()">
                         Apply filters
                     </button>
@@ -268,8 +295,8 @@
     <script>
         const getChannelsUrl = '@Url.Action("GetChannels", "Home")';
         const getUserLogsUrl = '@Url.Action("GetUserLogs", "Home")';
-        const channelUrl = '@Url.Action("Channel", "Home", new { id = ""})';
-        const getChannelBadgesUrl = '@Url.Action("GetChannelBadges", "Home", new { channelId = Model.Channel.UserId})';
+        const channelUrl = '@Url.Action("Channel", "Home", new { id = "" })';
+        const getChannelBadgesUrl = '@Url.Action("GetChannelBadges", "Home", new { channelId = Model.Channel.UserId })';
         const channelId = '@Model.Channel.UserId';
         const channelLogin = '@Model.Channel.Login';
     </script>

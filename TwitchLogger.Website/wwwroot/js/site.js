@@ -108,6 +108,12 @@ function confirmObjectDelete(e) {
         });
 }
 
+const subTierDescriptor = {
+    '1000': 'Sub Tier 1',
+    '2000': 'Sub Tier 2',
+    '3000': 'Sub Tier 3'
+};
+
 (function () {
     const printSpans = document.querySelectorAll('span[data-print-type]');
     for (let i = 0; i < printSpans.length; i++) {
@@ -119,6 +125,8 @@ function confirmObjectDelete(e) {
             span.innerText = parseInt(value).toLocaleString();
         } else if (span.dataset.printType == 'bytes') {
             span.innerText = formatBytes(value).toLocaleString();
+        } else if (span.dataset.printType == 'subTier') {
+            span.innerText = subTierDescriptor[value] ?? value;
         }
     }
 

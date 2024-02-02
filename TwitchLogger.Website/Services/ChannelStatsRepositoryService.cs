@@ -64,5 +64,30 @@ namespace TwitchLogger.Website.Services
                 Sort = Builders<TwitchUserStatDTO>.Sort.Descending(x => x.Messages)
             })).ToListAsync();
         }
+
+        public async Task<List<Tuple<string, int>>> GetUniqueSubscriptions(string channelId, long from, long to)
+        {
+            var twitchSubscriptions = _databaseService.GetTwitchUserSubscriptionsCollection();
+            var result = new List<Tuple<string, int>>();
+            Dictionary<string, HashSet<string>> group = new();
+
+            await (await twitchSubscriptions.FindAsync(x => x.RoomId == channelId && x.Timestamp >= from && x.Timestamp <= to)).ForEachAsync(x =>
+            {
+                if (!group.TryGetValue(x.SubPlan, out var result))
+                {
+                    result = new();
+                    group.Add(x.SubPlan, result);
+                }
+
+                result.Add(x.RecipientUserId);
+            });
+
+            foreach (var it in group)
+                result.Add(new Tuple<string, int>(it.Key, it.Value.Count));
+
+            result.Sort((x, y) => y.Item2 - x.Item2);
+
+            return result;
+        }
     }
 }

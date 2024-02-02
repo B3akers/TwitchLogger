@@ -245,6 +245,7 @@ function onLogContainerScroll(e) {
 function applyIndexesForLogs(mainContainer, userId, logTime) {
     const tbody = mainContainer.querySelector('div[data-table-log-date]');
     const indexArray = userLogsDataIndexes[userId + logTime];
+    const messages = userLogsData[userId + logTime];
 
     const messageLength = indexArray ? indexArray.length : messages.length;
     tbody.style.height = (2.5 * messageLength) + "rem";
@@ -263,25 +264,28 @@ function createIndexesForLogs(userId, logTime, filters) {
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
 
-            let passed = false;
+            let passed = 0;
 
             for (let y = 0; y < filters.length; y++) {
                 const filter = filters[y];
                 if (filter.type == 'userName') {
                     for (let y1 = 0; y1 < filter.value.length; y1++) {
-                        if (message.displayName.localeCompare(filter.value[y1]) == 0) {
-                            passed = true;
+                        if (message.displayName.toLowerCase().localeCompare(filter.value[y1]) == 0) {
+                            passed++;
                             break;
                         }
                     }
-
+                } else if (filter.type == 'content') {
+                    if (message.message.toLowerCase().indexOf(filter.value) != -1) {
+                        passed++;
+                    }
                 }
 
-                if (passed)
+                if (passed == filters.length)
                     break;
             }
 
-            if (passed)
+            if (passed == filters.length)
                 indexArray.push(i);
         }
 
@@ -299,9 +303,10 @@ function getFiltersForChannelLogs() {
     const users = filtersContainer.querySelector('textarea').value.split('\n').reduce(function (result, element) {
         let value = element.trim();
         if (value)
-            result.push(value);
+            result.push(value.toLowerCase());
         return result;
     }, []);
+
 
     const filters = [];
 
@@ -309,6 +314,14 @@ function getFiltersForChannelLogs() {
         filters.push({
             type: 'userName',
             value: users
+        });
+    }
+
+    const content = filtersContainer.querySelector('input[type="text"]').value;
+    if (content) {
+        filters.push({
+            type: 'content',
+            value: content.toLowerCase()
         });
     }
 
@@ -327,6 +340,8 @@ function applyChannelLogsFilters() {
             const filter = filters[i];
             if (filter.type == 'userName') {
                 filterParam = '&filterUser=' + encodeURIComponent(filter.value.join(','));
+            } else if (filter.type == 'content') {
+                filterParam = '&content=' + encodeURIComponent(filter.value);
             }
         }
     }
@@ -404,6 +419,14 @@ function getChannelLogsSuccess(data) {
     const mainContainer = document.getElementById('channelLogsContainer');
     mainContainer.innerHTML = '';
 
+    const keys = Object.keys(userLogsData);
+    for (let i = 0; i < keys.length; i++) {
+        if (keys[i].endsWith('channel')) {
+            delete userLogsData[keys[i]];
+            break;
+        }
+    }
+
     let filters = [];
 
     const dateInput = document.getElementById('channelLogsTab2').querySelector('form input[type="date"]');
@@ -415,7 +438,7 @@ function getChannelLogsSuccess(data) {
         delete dateInput.dataset.isScriptSwitch;
         filters = getFiltersForChannelLogs();
     }
-    
+
     const logContainer = document.createElement('div');
     logContainer.classList.add('container', 'container-logs', 'border');
     logContainer.innerHTML = `<div data-table-log-date="channel"></div>`;

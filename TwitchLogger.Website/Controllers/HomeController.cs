@@ -60,8 +60,13 @@ namespace TwitchLogger.Website.Controllers
             if (channel == null)
                 return View("Index");
 
+            var currentTime = DateTimeOffset.UtcNow;
+            var lastMonth = currentTime.AddMonths(-1);
+            var uniqueSubscriptions = await _channelStatsRepository.GetUniqueSubscriptions(id, lastMonth.ToUnixTimeSeconds(), currentTime.ToUnixTimeSeconds());
+
             var viewModel = new ChannelViewModel();
             viewModel.Channel = channel;
+            viewModel.Subscriptions = uniqueSubscriptions;
             return View(viewModel);
         }
 
