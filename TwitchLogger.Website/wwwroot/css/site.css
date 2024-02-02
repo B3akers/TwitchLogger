@@ -26,9 +26,9 @@ div.pinned {
         display: none;
     }
 
-    .list-item {
-        padding: 10px 10px;
-    }
+.list-item {
+    padding: 10px 10px;
+}
 
     .list-item:hover {
         background-color: #26262c;
@@ -93,6 +93,19 @@ a:hover {
     white-space: nowrap;
     margin-bottom: 1rem;
 }
+
+.txt {
+    position: absolute;
+    top: 5px;
+    right: 15px;
+    opacity: 0.9;
+    cursor: pointer;
+    z-index: 999;
+}
+
+    .txt:hover {
+        opacity: 1;
+    }
 
 @media (max-width: 900px) {
     .sidebar-channels {

@@ -224,6 +224,7 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
             dateStr: dateStr,
             color: color,
             badges: badges,
+            channel: commandArgs[3],
             isMeCommand: isMeCommand
         });
     }
@@ -414,6 +415,53 @@ function createLogsForData(logContainer, data, userId, userLogin, logTime, pinMe
         loadMessagesForContainer(tbody, 0);
     }
 }
+function navigate(href) {
+    var a = document.createElement('a');
+    a.href = href;
+    a.setAttribute('target', '_blank');
+    a.click();
+}
+
+function exportIconClick(e) {
+    const target = e.target;
+    let tableLogs = target.parentElement;
+    while (tableLogs.tagName != "DIV" || !tableLogs.classList.contains('position-relative')) {
+        tableLogs = tableLogs.parentElement;
+    }
+
+    const container = tableLogs.querySelector('div[data-table-log-date]');
+
+    if (!tableLogs)
+        return;
+
+    const messages = userLogsData[container.dataset.userId + container.dataset.date];
+    if (!messages)
+        return;
+
+    const indexes = userLogsDataIndexes[container.dataset.userId + container.dataset.date];
+    const messageLength = indexes ? indexes.length : messages.length;
+
+    const blobData = [];
+
+    for (let i = 0; i < messageLength; i++) {
+        const message = messages[indexes ? indexes[i] : i];
+        blobData.push(`[${message.dateStr}] ${message.channel} ${message.displayName}: ${message.message}\n`);
+    }
+
+    const blob = new Blob(blobData, { type: "text/plain;charset=utf8" });
+    const url = URL.createObjectURL(blob);
+
+    navigate(url);
+}
+
+function getExportIconElement() {
+    const exportElement = document.createElement('span');
+    exportElement.classList.add('txt');
+    exportElement.innerHTML = '<svg class="txt" height="32" viewBox="0 0 32 32" width="32"><title></title><path d="M21 26v2.003A1.995 1.995 0 0119.003 30H3.997A2 2 0 012 27.993V5.007C2 3.898 2.9 3 4.009 3H14v6.002c0 1.111.898 1.998 2.006 1.998H21v2h-8.993A3.003 3.003 0 009 15.999V23A2.996 2.996 0 0012.007 26H21zM15 3v5.997c0 .554.451 1.003.99 1.003H21l-6-7zm-3.005 11C10.893 14 10 14.9 10 15.992v7.016A2 2 0 0011.995 25h17.01C30.107 25 31 24.1 31 23.008v-7.016A2 2 0 0029.005 14h-17.01zM14 17v6h1v-6h2v-1h-5v1h2zm6 2.5L18 16h1l1.5 2.625L22 16h1l-2 3.5 2 3.5h-1l-1.5-2.625L19 23h-1l2-3.5zm6-2.5v6h1v-6h2v-1h-5v1h2z" fill="#929292" fill-rule="evenodd"></path></svg>';
+    exportElement.addEventListener('click', exportIconClick);
+
+    return exportElement;
+}
 
 function getChannelLogsSuccess(data) {
     const mainContainer = document.getElementById('channelLogsContainer');
@@ -443,6 +491,9 @@ function getChannelLogsSuccess(data) {
     logContainer.classList.add('container', 'container-logs', 'border');
     logContainer.innerHTML = `<div data-table-log-date="channel"></div>`;
 
+    const exportElement = getExportIconElement();
+
+    mainContainer.appendChild(exportElement);
     mainContainer.appendChild(logContainer);
 
     logContainer.querySelector('div[data-table-log-date]').dataset.channelLogDate = dateInput.value;
@@ -472,10 +523,19 @@ function loadUserLogs(e) {
                 const userId = target.dataset.userId;
                 const userLogin = target.dataset.userLogin;
 
+                const mainLogContainer = document.createElement('div');
+                mainLogContainer.classList.add('position-relative');
+
+                const exportElement = getExportIconElement();
+                mainLogContainer.appendChild(exportElement);
+
                 const logContainer = document.createElement('div');
                 logContainer.classList.add('container', 'container-logs', 'border');
                 logContainer.innerHTML = `<div data-table-log-date="${logTime}"></div>`;
-                target.replaceWith(logContainer);
+
+                mainLogContainer.appendChild(logContainer);
+
+                target.replaceWith(mainLogContainer);
 
                 dataPromise.then((data) => {
                     createLogsForData(logContainer, data, userId, userLogin, logTime, e.pinMessageAfetrLog, null);
