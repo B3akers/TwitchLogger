@@ -87,6 +87,42 @@ namespace TwitchLogger.Website.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> GetUserStats([FromBody] GetUserStatsModel model)
+        {
+            if (!ModelState.IsValid)
+                return Json(new { error = "invalid_model" });
+
+            var backupUser = model.User;
+            model.User = await _twitchAccountRepository.GetUserIdFromParam(model.User);
+
+            if (string.IsNullOrEmpty(model.User))
+                return Json(new { user = string.Empty, messages = 0, words = 0, chars = 0 });
+
+            var result = await _channelStatsRepository.GetUserStats(model.Id, model.User, model.Year);
+            if (result == null)
+                return Json(new { user = string.Empty, messages = 0, words = 0, chars = 0 });
+
+            return Json(new { user = backupUser, result.Messages, result.Words, result.Chars });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GetWordCount([FromBody] GetWordCountModel model)
+        {
+            if (!ModelState.IsValid)
+                return Json(new { error = "invalid_model" });
+
+            var userBackup = string.Empty;
+
+            if (!string.IsNullOrEmpty(model.User))
+            {
+                userBackup = model.User;
+                model.User = await _twitchAccountRepository.GetUserIdFromParam(model.User);
+            }
+
+            return Json(new { word = model.Word, user = userBackup, count = await _channelStatsRepository.GetWordCount(model.Id, model.Word, model.User, model.Year) });
+        }
+
+        [HttpPost]
         public async Task<IActionResult> GetTopUserWords([FromBody] GetTopUserWordsModel model)
         {
             if (!ModelState.IsValid)

@@ -118,7 +118,6 @@
     }
     <hr />
     <div class="container">
-
         <div class="row">
             <div class="col-sm">
                 <h3 class="text-center">Top words</h3>
@@ -140,6 +139,22 @@
                         </tbody>
                     </table>
                 </div>
+                <h3 id="wordCountText" class="text-center"></h3>
+                <form class="p-2" data-url="@Url.Action("GetWordCount","Home")" data-callback="getWordCountSuccess">
+                    <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+                    <input data-form-name="year" value="0" type="hidden">
+                    <div class="mb-1">
+                        <label>Word</label>
+                        <input data-form-name="word" type="text" class="form-control" required="">
+                    </div>
+                    <div class="mb-1">
+                        <label>User</label>
+                        <input data-form-name="user" type="text" placeholder="Can be empty" class="form-control">
+                    </div>
+                    <div class="mb-1">
+                        <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+                    </div>
+                </form>
             </div>
             <div class="col-sm">
                 <h3 class="text-center">Top users</h3>
@@ -163,6 +178,19 @@
                         </tbody>
                     </table>
                 </div>
+                <h3 id="userStatsText" class="text-center"></h3>
+                <form class="p-2" data-url="@Url.Action("GetUserStats","Home")" data-callback="getUserStatsSuccess">
+                    <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+                    <input data-form-name="year" value="0" type="hidden">
+                    <div class="mb-1">
+                        <label>User</label>
+                        <input data-form-name="user" type="text" class="form-control" required="">
+                    </div>
+                    <div class="mb-1">
+                        <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+                    </div>
+                </form>
+
             </div>
         </div>
     </div>

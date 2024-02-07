@@ -605,6 +605,31 @@ function convertUserDataToObject(userData) {
     return usersData;
 }
 
+function updateUrlChannelStats() {
+    const form = document.querySelector('form[data-callback="getTopWordsSuccess"]');
+    const year = form.querySelector('input[data-form-name="year"]').value;
+
+    const formWordCount = document.querySelector('form[data-callback="getWordCountSuccess"]');
+    const wordCountWord = formWordCount.querySelector('input[data-form-name="word"]').value;
+    const userCountWord = formWordCount.querySelector('input[data-form-name="user"]').value;
+
+    const formUserStats = document.querySelector('form[data-callback="getUserStatsSuccess"]');
+    const userStats = formUserStats.querySelector('input[data-form-name="user"]').value;
+
+    let urlData = `&year=${encodeURIComponent(year)}`;
+
+    if (wordCountWord)
+        urlData += `&word=${encodeURIComponent(wordCountWord)}`;
+
+    if (userCountWord)
+        urlData += `&user=${encodeURIComponent(userCountWord)}`;
+
+    if (userStats)
+        urlData += `&suser=${encodeURIComponent(userStats)}`;
+
+    window.history.replaceState(null, null, `?subtab=channelStats${urlData}`);
+}
+
 function getTopUsersSuccess(json) {
     const form = document.querySelector('form[data-callback="getTopUsersSuccess"]');
     const year = form.querySelector('input[data-form-name="year"]').value;
@@ -671,10 +696,7 @@ function getTopChattersSuccess(json) {
 }
 
 function getTopWordsSuccess(json) {
-    const form = document.querySelector('form[data-callback="getTopWordsSuccess"]');
-    const year = form.querySelector('input[data-form-name="year"]').value;
-
-    window.history.replaceState(null, null, `?subtab=channelStats&year=${encodeURIComponent(year)}`);
+    updateUrlChannelStats();
 
     const tbody = document.getElementById('tableWords').querySelector('tbody');
     tbody.innerHTML = '';
@@ -698,6 +720,23 @@ function getTopWordsSuccess(json) {
         tr.appendChild(tdCount);
         tbody.appendChild(tr);
     }
+}
+
+function getUserStatsSuccess(json) {
+    if (!json.user)
+        return;
+
+    updateUrlChannelStats();
+
+    const userStatsText = document.getElementById('userStatsText');
+    userStatsText.innerText = `User "${json.user}" Messages: ${json.messages.toLocaleString()} Words: ${json.words.toLocaleString()} Chars: ${json.chars.toLocaleString()}`;
+}
+
+function getWordCountSuccess(json) {
+    updateUrlChannelStats();
+
+    const wordCountText = document.getElementById('wordCountText');
+    wordCountText.innerText = `Word "${json.word}" was used${(json.user ? ` by "${json.user}"` : '')} ${json.count.toLocaleString()} times`;
 }
 
 function onYearSwitch(e) {
@@ -817,6 +856,26 @@ function onTabSwitch(e) {
             channelStatsLoaded = true;
             const url = new URL(window.location.href);
             const year = url.searchParams.get('year');
+
+            {
+                const word = url.searchParams.get('word');
+                const user = url.searchParams.get('user');
+                const form = document.querySelector('form[data-callback="getWordCountSuccess"]');
+
+                if (word)
+                    form.querySelector('input[data-form-name="word"]').value = word;
+
+                if (user)
+                    form.querySelector('input[data-form-name="user"]').value = user;
+            }
+
+            {
+                const formUserStats = document.querySelector('form[data-callback="getUserStatsSuccess"]');
+                const suser = url.searchParams.get('suser');
+
+                if (suser)
+                    formUserStats.querySelector('input[data-form-name="user"]').value = suser;
+            }
 
             const currentYearSwitch = document.querySelector(`span[data-year-switch-for="channelStats"][data-year-switch="${year ?? '0'}"]`);
             onYearSwitch({ target: currentYearSwitch });

@@ -89,5 +89,37 @@ namespace TwitchLogger.Website.Services
 
             return result;
         }
+
+        public async Task<TwitchUserStatDTO> GetUserStats(string channelId, string user, int year = 0)
+        {
+            var userStats = _databaseService.GetTwitchUserStatsCollection();
+            return await (await userStats.FindAsync(x => x.RoomId == channelId && x.Year == year && x.UserId == user)).FirstOrDefaultAsync();
+        }
+
+        public async Task<ulong> GetWordCount(string channelId, string word, string user, int year = 0)
+        {
+            if (string.IsNullOrEmpty(user))
+            {
+                var wordStats = _databaseService.GetTwitchWordStatCollection();
+
+                var result = await (await wordStats.FindAsync(x => x.RoomId == channelId && x.Year == year && x.Word == word, new FindOptions<TwitchWordStatDTO>()
+                {
+                    Collation = _ignoreCaseCollation
+                })).FirstOrDefaultAsync();
+
+                return result == null ? 0 : result.Count;
+            }
+            else
+            {
+                var wordUserStats = _databaseService.GetTwitchWordUserStatCollection();
+
+                var result = await (await wordUserStats.FindAsync(x => x.RoomId == channelId && x.Year == year && x.UserId == user && x.Word == word, new FindOptions<TwitchWordUserStatDTO>()
+                {
+                    Collation = _ignoreCaseCollation
+                })).FirstOrDefaultAsync();
+
+                return result == null ? 0 : result.Count;
+            }
+        }
     }
 }
