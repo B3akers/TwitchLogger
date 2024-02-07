@@ -58,7 +58,7 @@ namespace TwitchLogger.Website.Controllers
         {
             var channel = await _channelRepository.GetChannelByUserId(id);
             if (channel == null)
-                return View("Index");
+                return await Index();
 
             var currentTime = DateTimeOffset.UtcNow;
             var lastMonth = currentTime.AddMonths(-1);
