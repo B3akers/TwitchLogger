@@ -757,7 +757,10 @@ function onYearSwitch(e) {
             const form = forms[i];
             const yearInput = form.querySelector('input[data-form-name="year"]');
             yearInput.value = target.dataset.yearSwitch;
-            form.requestSubmit(form.querySelector('button[type="submit"]'));
+
+            if (form.checkValidity()) {
+                form.requestSubmit(form.querySelector('button[type="submit"]'));
+            }
         }
     }
 }
