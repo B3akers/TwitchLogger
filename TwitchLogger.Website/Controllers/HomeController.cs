@@ -49,7 +49,7 @@ namespace TwitchLogger.Website.Controllers
             if (model.DatabaseSize == null)
                 model.DatabaseSize = new Tuple<long, long>(0, 0);
 
-            return View(model);
+            return View("Index", model);
         }
 
         [Route("Home/Channel/{id?}")]
