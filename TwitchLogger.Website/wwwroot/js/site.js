@@ -57,6 +57,26 @@ function translateCode(code) {
     return englishTranslation[code] ?? code;
 }
 
+function relativeTime(x) {
+    const ymwdhm = [[31536000, 'year'],
+    [2592000, 'month']];
+    let age = '';
+
+    for (let i = 0; i < ymwdhm.length; i++) {
+        if (x >= ymwdhm[i][0]) {
+            const res = parseInt(x / ymwdhm[i][0], 10);
+            age += res;
+            age += ' ';
+            age += ymwdhm[i][1];
+            age += res > 1 ? 's ' : ' '; // plural
+
+            return age + relativeTime(x - (res * ymwdhm[i][0]));
+        }
+    }
+
+    return age;
+}
+
 function getPostRequestOptions(jsonData) {
     return {
         method: 'POST',
@@ -127,7 +147,13 @@ const subTierDescriptor = {
             span.innerText = formatBytes(value).toLocaleString();
         } else if (span.dataset.printType == 'subTier') {
             span.innerText = subTierDescriptor[value] ?? value;
+        } else if (span.dataset.printType == 'monthTime') {
+            span.innerText = relativeTime(parseInt(value) * 30 * 24 * 3600);
+        } else {
+            span.innerText = value;
         }
+
+        //
     }
 
     const forms = document.querySelectorAll('form');

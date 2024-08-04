@@ -110,49 +110,61 @@ function loadMessagesForContainer(container, cursor) {
         mainMessageDiv.style.padding = '0.2rem';
 
         const datetimeSpan = document.createElement('span');
-        const mainUserSpan = document.createElement('span');
-        const mainMessageSpan = document.createElement('span');
-
+        datetimeSpan.classList.add('prevent-select');
         datetimeSpan.style.marginRight = '0.5rem';
-        mainUserSpan.style.marginRight = '0.5rem';
-
-        if (channelChatInfo.badges) {
-            for (let y = 0; y < command.badges.length; y++) {
-                const badgePath = command.badges[y].split('/');
-                if (badgePath.length == 2) {
-                    const badgeInfo = channelChatInfo.badges[badgePath[0]]?.[badgePath[1]] ?? null;
-                    if (badgeInfo) {
-                        const img = document.createElement('img');
-                        img.setAttribute('src', badgeInfo.image);
-                        img.setAttribute('alt', command.badges[y]);
-                        img.setAttribute('title', badgeInfo.title);
-                        img.style.marginRight = '5px';
-                        mainUserSpan.appendChild(img);
-                    }
-                }
-            }
-        }
-
-        const span = document.createElement('span');
-        span.style.color = command.color;
-        span.innerText = command.displayName;
-
-        const spanMessage = document.createElement('span');
-        spanMessage.innerText = command.message;
-        if (command.isMeCommand) {
-            spanMessage.style.color = command.color;
-        }
-
         datetimeSpan.innerText = command.dateStr;
         datetimeSpan.classList.add('cursor-pointer');
         datetimeSpan.dataset.msgId = command.messageId;
         datetimeSpan.addEventListener('click', onMessageLogPin);
-        mainUserSpan.appendChild(span);
-        mainMessageSpan.appendChild(spanMessage);
-
         mainMessageDiv.appendChild(datetimeSpan);
-        mainMessageDiv.appendChild(mainUserSpan);
-        mainMessageDiv.appendChild(mainMessageSpan);
+
+        if (command.type == 'MESSAGE') {
+            const mainUserSpan = document.createElement('span');
+            const mainMessageSpan = document.createElement('span');
+
+            mainUserSpan.classList.add('prevent-select');
+            mainUserSpan.style.marginRight = '0.5rem';
+
+            if (channelChatInfo.badges) {
+                for (let y = 0; y < command.params.badges.length; y++) {
+                    const badgePath = command.params.badges[y].split('/');
+                    if (badgePath.length == 2) {
+                        const badgeInfo = channelChatInfo.badges[badgePath[0]]?.[badgePath[1]] ?? null;
+                        if (badgeInfo) {
+                            const img = document.createElement('img');
+                            img.setAttribute('src', badgeInfo.image);
+                            img.setAttribute('alt', command.params.badges[y]);
+                            img.setAttribute('title', badgeInfo.title);
+                            img.style.marginRight = '5px';
+                            mainUserSpan.appendChild(img);
+                        }
+                    }
+                }
+            }
+
+            const span = document.createElement('span');
+            span.style.color = command.params.color;
+            span.innerText = command.params.displayName;
+
+            const spanMessage = document.createElement('span');
+            spanMessage.innerText = command.params.message;
+            if (command.params.isMeCommand) {
+                spanMessage.style.color = command.params.color;
+            }
+
+            mainUserSpan.appendChild(span);
+            mainMessageSpan.appendChild(spanMessage);
+
+            mainMessageDiv.appendChild(mainUserSpan);
+            mainMessageDiv.appendChild(mainMessageSpan);
+        } else if (command.type == 'BAN') {
+            const mainMessageSpan = document.createElement('span');
+            mainMessageSpan.classList.add('prevent-select');
+            mainMessageSpan.style.marginRight = '0.5rem';
+            mainMessageSpan.innerText = `${command.params.user} has been ${command.params.duration ? `timed out for ${command.params.duration} seconds.` : 'permanently banned!'}`;
+
+            mainMessageDiv.appendChild(mainMessageSpan);
+        }
 
         if (container.dataset.pinnedMsgId && container.dataset.pinnedMsgId == command.messageId) {
             mainMessageDiv.classList.add('pinned');
@@ -179,9 +191,18 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
         if (commandArgs.length < 2)
             continue;
 
-        if (commandArgs[2] != "PRIVMSG") {
+        let logType = '';
+
+        if (commandArgs[2] == "PRIVMSG") {
+            logType = 'MESSAGE';
+        } else if (commandArgs[2] == "CLEARCHAT" && commandArgs.length > 4) {
+            logType = 'BAN';
+        }
+       
+        if (!logType) {
             continue;
         }
+
         const senderInfos = {};
         const messageInfos = commandArgs[0].substring(1).split(';');
         for (let y = 0; y < messageInfos.length; y++) {
@@ -199,16 +220,12 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
             isMeCommand = true;
         }
 
-        const badges = senderInfos["badges"].split(',');
         const dateStr = new Date(parseInt(senderInfos["tmi-sent-ts"])).toLocaleString();
-        const color = senderInfos["color"] ?? '#FF4500';
 
         let messageId = senderInfos['id'];
         if (!messageId) {
             messageId = senderInfos['tmi-sent-ts'];
         }
-
-        const displayName = senderInfos["display-name"];
 
         if (pinMessageId && pinMessageId == messageId) {
             pinMsg = {
@@ -217,16 +234,38 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
             };
         }
 
-        parsedMessages.push({
-            message: message,
-            messageId: messageId,
-            displayName: displayName,
-            dateStr: dateStr,
-            color: color,
-            badges: badges,
-            channel: commandArgs[3],
-            isMeCommand: isMeCommand
-        });
+        if (logType == 'MESSAGE') {
+            const color = senderInfos["color"] ?? '#FF4500';
+            const badges = senderInfos["badges"].split(',');
+            const displayName = senderInfos["display-name"];
+
+            parsedMessages.push({
+                type: logType,
+                messageId: messageId,
+                dateStr: dateStr,
+                channel: commandArgs[3],
+                params: {
+                    message: message,
+                    displayName: displayName,
+                    color: color,
+                    badges: badges,
+                    isMeCommand: isMeCommand
+                }
+            });
+        } else if (logType == 'BAN') {
+            const duration = senderInfos["ban-duration"];
+
+            parsedMessages.push({
+                type: logType,
+                messageId: messageId,
+                dateStr: dateStr,
+                channel: commandArgs[3],
+                params: {
+                    user: message,
+                    duration: duration
+                }
+            });
+        }
     }
 
     return {
@@ -238,7 +277,12 @@ function onLogContainerScroll(e) {
     const target = e.target;
     const tbody = target.querySelector('div[data-table-log-date]');
     const messagePixels = 2.5 * parseFloat(getComputedStyle(tbody).fontSize);
-    const currentIndex = Math.floor(e.target.scrollTop / messagePixels);
+
+    let scrollTop = e.target.scrollTop;
+    if (scrollTop > 0)
+        scrollTop = Math.max(scrollTop, messagePixels);
+
+    const currentIndex = Math.floor(scrollTop / messagePixels);
 
     loadMessagesForContainer(tbody, currentIndex);
 }
@@ -445,7 +489,12 @@ function exportIconClick(e) {
 
     for (let i = 0; i < messageLength; i++) {
         const message = messages[indexes ? indexes[i] : i];
-        blobData.push(`[${message.dateStr}] ${message.channel} ${message.displayName}: ${message.message}\n`);
+
+        if (message.type == 'MESSAGE') {
+            blobData.push(`[${message.dateStr}] ${message.channel} ${message.params.displayName}: ${message.params.message}\n`);
+        } else if (message.type == 'BAN') {
+            blobData.push(`[${message.dateStr}] ${message.channel} :${message.params.user}: ${message.params.user} has been ${message.params.duration ? `timed out for ${message.params.duration} seconds.` : 'permanently banned!'}\n`);
+        }
     }
 
     const blob = new Blob(blobData, { type: "text/plain;charset=utf8" });
@@ -488,7 +537,7 @@ function getChannelLogsSuccess(data) {
     }
 
     const logContainer = document.createElement('div');
-    logContainer.classList.add('container', 'container-logs', 'border');
+    logContainer.classList.add('container-logs', 'border');
     logContainer.innerHTML = `<div data-table-log-date="channel"></div>`;
 
     const exportElement = getExportIconElement();
@@ -530,12 +579,13 @@ function loadUserLogs(e) {
                 mainLogContainer.appendChild(exportElement);
 
                 const logContainer = document.createElement('div');
-                logContainer.classList.add('container', 'container-logs', 'border');
+                logContainer.classList.add('container-logs', 'border');
                 logContainer.innerHTML = `<div data-table-log-date="${logTime}"></div>`;
 
                 mainLogContainer.appendChild(logContainer);
 
-                target.replaceWith(mainLogContainer);
+                const replaceMe = target.tagName === 'DIV' ? target : target.parentElement;
+                replaceMe.replaceWith(mainLogContainer);
 
                 dataPromise.then((data) => {
                     createLogsForData(logContainer, data, userId, userLogin, logTime, e.pinMessageAfetrLog, null);
@@ -573,16 +623,19 @@ function getUserLogsTimesSuccess(json) {
 
     for (let i = (json.data.length - 1); i >= 0; i--) {
         const dateStr = json.data[i];
+        const div = document.createElement('div');
+        div.classList.add('text-center');
         const button = document.createElement('button');
         button.setAttribute('type', 'button');
-        button.classList.add('btn', 'btn-primary', 'w-100', 'm-2');
+        button.classList.add('btn', 'btn-primary', 'm-2');
         button.innerText = dateStr;
         button.dataset.time = dateStr;
         button.dataset.userLogin = userLogin;
         button.dataset.userId = json.userId;
         button.dataset.roomId = json.roomId;
         button.addEventListener('click', loadUserLogs);
-        container.appendChild(button);
+        div.appendChild(button);
+        container.appendChild(div);
     }
 
     const newUrl = `?subtab=userLogs&userLogin=${encodeURIComponent(userLogin)}&userId=${encodeURIComponent(json.userId)}`;

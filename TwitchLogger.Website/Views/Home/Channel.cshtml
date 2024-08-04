@@ -90,26 +90,62 @@
         </ul>
     </div>
     <hr />
-    <div class="text-center">
-        <h4>Active subscribers</h4>
-        <div class="container text-center d-flex">
-            <table class="table table-hover border-primary table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th scope="col">Plan</th>
-                        <th scope="col">Count</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (var i = 0; i < Model.Subscriptions.Count; i++)
-                    {
-                        <tr>
-                            <td><span data-print-type="subTier" data-value="@Model.Subscriptions[i].Item1"></span></td>
-                            <td><span data-print-type="number" data-value="@Model.Subscriptions[i].Item2"></span></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    <div class="container">
+        <div class="row">
+            <div class="col-sm">
+                <div class="text-center">
+                    <h4>Active subscribers</h4>
+                    <div class="container text-center d-flex">
+                        <table class="table table-hover border-primary table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Plan</th>
+                                    <th scope="col">Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < Model.Subscriptions.Count; i++)
+                                {
+                                    <tr>
+                                        <td><span data-print-type="subTier" data-value="@Model.Subscriptions[i]._id"></span></td>
+                                        <td><span data-print-type="number" data-value="@Model.Subscriptions[i].Count"></span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm">
+                <div class="text-center">
+                    <h4>Top subscribers</h4>
+                    <table class="table table-hover border-primary table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">User</th>
+                                <th scope="col">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Model.TopSubscribers.Count; i++)
+                            {
+                                <tr>
+                                    @if (Model.TopSubscribers[i].User.Length == 0)
+                                    {
+                                        <td><span data-print-type="text" data-value="@Model.TopSubscribers[i]._id"></span></td>
+                                    }
+                                    else
+                                    {
+                                        <td><span data-print-type="text" data-value="@Model.TopSubscribers[i].User[0].DisplayName"></span></td>
+                                    }
+
+                                    <td><span data-print-type="monthTime" data-value="@Model.TopSubscribers[i].Months"></span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
     <hr />
@@ -126,7 +162,7 @@
                     <input data-form-name="year" value="0" type="hidden">
                     <button type="submit"></button>
                 </form>
-                <div class="container p-3 container-logs border">
+                <div class="container p-3 container-table-logs border">
                     <table id="tableWords" class="table table-hover border-primary table-bordered table-striped">
                         <thead>
                             <tr>
@@ -163,7 +199,7 @@
                     <input data-form-name="year" value="0" type="hidden">
                     <button type="submit"></button>
                 </form>
-                <div class="container p-3 container-logs border">
+                <div class="container p-3 container-table-logs border">
                     <table id="tableUsers" class="table table-hover border-primary table-bordered table-striped">
                         <thead>
                             <tr>
@@ -254,67 +290,73 @@
     </table>
 </div>
 
-<div data-subtab="userLogs" class="container d-none">
+<div data-subtab="userLogs" class="d-none">
 
-    <div id="userLogsTab1" class="text-center">
-        Loading...
+    <div class="container">
+        <div id="userLogsTab1" class="text-center">
+            Loading...
+        </div>
     </div>
-
     <div id="userLogsTab2" class="d-none">
-        <form class="p-2" data-url="@Url.Action("GetUserLogsTimes","Home")" data-callback="getUserLogsTimesSuccess">
-            <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
-            <div class="mb-1">
-                <label>User</label>
-                <input data-form-name="user" type="text" class="form-control" required="">
-            </div>
-            <div class="mb-1">
-                <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
-            </div>
-        </form>
-        <hr />
-        <div class="container" id="userLogsContainer">
+        <div class="container">
+            <form class="p-2" data-url="@Url.Action("GetUserLogsTimes","Home")" data-callback="getUserLogsTimesSuccess">
+                <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+                <div class="mb-1">
+                    <label>User</label>
+                    <input data-form-name="user" type="text" class="form-control" required="">
+                </div>
+                <div class="mb-1">
+                    <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+                </div>
+            </form>
+            <hr />
+        </div>
+        <div id="userLogsContainer">
         </div>
     </div>
 </div>
 
-<div data-subtab="channelLogs" class="container d-none">
-    <div id="channelLogsTab1" class="text-center">
-        Loading...
-    </div>
-
-    <div id="channelLogsTab2" class="d-none">
-        <form class="p-2" data-url="@Url.Action("GetChannelLogs","Home")" data-raw="true" data-callback="getChannelLogsSuccess">
-            <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
-            <div class="mb-1">
-                <label>Date</label>
-                <input data-form-name="date" data-form-type="date" type="date" class="form-control" required="">
-            </div>
-            <div class="mb-1">
-                <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
-            </div>
-        </form>
-        <div class="container text-center">
-            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#channelLogFilters" aria-expanded="false" aria-controls="channelLogFilters">
-                Toogle filters
-            </button>
-            <div class="collapse m-2" id="channelLogFilters">
-                <div class="mb-1">
-                    <label>Users</label>
-                    <textarea class="form-control" rows="2"></textarea>
-                </div>
-                <div class="mb-1">
-                    <label>Content</label>
-                    <input type="text" class="form-control"></input>
-                </div>
-                <div class="mb-1">
-                    <button class="btn btn-primary" type="button" onclick="applyChannelLogsFilters()">
-                        Apply filters
-                    </button>
-                </div>
-            </div>
+<div data-subtab="channelLogs" class="d-none">
+    <div class="container">
+        <div id="channelLogsTab1" class="text-center">
+            Loading...
         </div>
-        <hr />
-        <div class="container position-relative" id="channelLogsContainer">
+    </div>
+    <div id="channelLogsTab2" class="d-none">
+        <div class="container">
+            <form class="p-2" data-url="@Url.Action("GetChannelLogs","Home")" data-raw="true" data-callback="getChannelLogsSuccess">
+                <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
+                <div class="mb-1">
+                    <label>Date</label>
+                    <input data-form-name="date" data-form-type="date" type="date" class="form-control" required="">
+                </div>
+                <div class="mb-1">
+                    <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
+                </div>
+            </form>
+            <div class="container text-center">
+                <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#channelLogFilters" aria-expanded="false" aria-controls="channelLogFilters">
+                    Toogle filters
+                </button>
+                <div class="collapse m-2" id="channelLogFilters">
+                    <div class="mb-1">
+                        <label>Users</label>
+                        <textarea class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-1">
+                        <label>Content</label>
+                        <input type="text" class="form-control"></input>
+                    </div>
+                    <div class="mb-1">
+                        <button class="btn btn-primary" type="button" onclick="applyChannelLogsFilters()">
+                            Apply filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <hr />
+        </div>
+        <div class="position-relative" id="channelLogsContainer">
         </div>
     </div>
 </div>

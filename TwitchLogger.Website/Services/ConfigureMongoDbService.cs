@@ -40,6 +40,7 @@ namespace TwitchLogger.Website.Services
 
             var twitchUserSubscriptions = _databaseService.GetTwitchUserSubscriptionsCollection();
             await twitchUserSubscriptions.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserSubscriptionDTO>(Builders<TwitchUserSubscriptionDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.Timestamp)));
+            await twitchUserSubscriptions.Indexes.CreateOneAsync(new CreateIndexModel<TwitchUserSubscriptionDTO>(Builders<TwitchUserSubscriptionDTO>.IndexKeys.Ascending(x => x.RoomId).Descending(x => x.CumulativeMonths).Ascending(x => x.RecipientUserId)));
 
             var twitchUserStats = _databaseService.GetTwitchUserStatsCollection();
             await twitchUserStats.Indexes.CreateManyAsync(new[]

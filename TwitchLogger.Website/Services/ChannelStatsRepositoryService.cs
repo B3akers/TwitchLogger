@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using TwitchLogger.DTO;
 using TwitchLogger.Website.Interfaces;
 
@@ -65,29 +66,37 @@ namespace TwitchLogger.Website.Services
             })).ToListAsync();
         }
 
-        public async Task<List<Tuple<string, int>>> GetUniqueSubscriptions(string channelId, long from, long to)
+        public async Task<List<UserTopSubscription>> GetTopSubscriptions(string channelId)
         {
             var twitchSubscriptions = _databaseService.GetTwitchUserSubscriptionsCollection();
-            var result = new List<Tuple<string, int>>();
-            Dictionary<string, HashSet<string>> group = new();
 
-            await (await twitchSubscriptions.FindAsync(x => x.RoomId == channelId && x.Timestamp >= from && x.Timestamp <= to)).ForEachAsync(x =>
-            {
-                if (!group.TryGetValue(x.SubPlan, out var result))
+            var pipeline = new EmptyPipelineDefinition<TwitchUserSubscriptionDTO>()
+                .Match(Builders<TwitchUserSubscriptionDTO>.Filter.Eq(x => x.RoomId, channelId))
+                .Group(x => x.RecipientUserId, g => new UserTopSubscription()
                 {
-                    result = new();
-                    group.Add(x.SubPlan, result);
-                }
+                    _id = g.Key,
+                    Months = g.Max(x => x.CumulativeMonths)
+                })
+                .Sort(Builders<UserTopSubscription>.Sort.Descending(x => x.Months))
+                .Limit(10)
+                .Lookup(_databaseService.GetTwitchAccountsStaticCollection(), x => x._id, x => x.UserId, (UserTopSubscription p) => p.User);
 
-                result.Add(x.RecipientUserId);
-            });
+            return await (await twitchSubscriptions.AggregateAsync(pipeline)).ToListAsync();
+        }
 
-            foreach (var it in group)
-                result.Add(new Tuple<string, int>(it.Key, it.Value.Count));
+        public async Task<List<SubscriptionPlanInfo>> GetUniqueSubscriptions(string channelId, long from, long to)
+        {
+            var twitchSubscriptions = _databaseService.GetTwitchUserSubscriptionsCollection();
+            var pipeline = new EmptyPipelineDefinition<TwitchUserSubscriptionDTO>()
+                .Match(x => x.RoomId == channelId && x.Timestamp >= from && x.Timestamp <= to)
+                .Group(x => x.SubPlan, g => new SubscriptionPlanInfo()
+                {
+                    _id = g.Key,
+                    Count = g.Count()
+                })
+                .Sort(Builders<SubscriptionPlanInfo>.Sort.Descending(x => x.Count));
 
-            result.Sort((x, y) => y.Item2 - x.Item2);
-
-            return result;
+            return await (await twitchSubscriptions.AggregateAsync(pipeline)).ToListAsync();
         }
 
         public async Task<TwitchUserStatDTO> GetUserStats(string channelId, string user, int year = 0)

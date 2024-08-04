@@ -43,7 +43,7 @@ namespace TwitchLogger.SimpleGraphQL
             return user["id"].ToString();
         }
 
-        public static async Task<List<string>> GetUsersIds(IEnumerable<string> logins)
+		public static async Task<List<string>> GetUsersIds(IEnumerable<string> logins)
         {
             var useLiveObjects = logins.Select(x => GetUseLiveObject(x)).ToList();
             List<string> result = new List<string>();

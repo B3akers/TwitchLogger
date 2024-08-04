@@ -1,5 +1,7 @@
-﻿using MongoDB.Driver;
+﻿using Microsoft.Extensions.Caching.Memory;
+using MongoDB.Driver;
 using TwitchLogger.DTO;
+using TwitchLogger.SimpleGraphQL;
 using TwitchLogger.Website.Interfaces;
 
 namespace TwitchLogger.Website.Services
@@ -7,9 +9,11 @@ namespace TwitchLogger.Website.Services
     public class TwitchAccountRepositoryService : ITwitchAccountRepository
     {
         private readonly DatabaseService _databaseService;
-        public TwitchAccountRepositoryService(DatabaseService databaseService)
+        private readonly IMemoryCache _memoryCache;
+        public TwitchAccountRepositoryService(DatabaseService databaseService, IMemoryCache memoryCache)
         {
             _databaseService = databaseService;
+            _memoryCache = memoryCache;
         }
 
         public async Task<long> GetEstimatedUniqueCount()
@@ -29,6 +33,15 @@ namespace TwitchLogger.Website.Services
             })).FirstOrDefaultAsync();
         }
 
+        public async Task InsertTwitchAccountLogin(string userId, string userLogin)
+        {
+            var twitchAccounts = _databaseService.GetTwitchAccountsCollection();
+            await twitchAccounts.UpdateOneAsync(x => x.UserId == userId && x.Login == userLogin, Builders<TwitchAccountDTO>.Update.Set(x => x.DisplayName, userLogin).SetOnInsert(x => x.RecordInsertTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds()), new UpdateOptions() { IsUpsert = true });
+
+            var twitchStaticAccounts = _databaseService.GetTwitchAccountsStaticCollection();
+            await twitchStaticAccounts.UpdateOneAsync(x => x.UserId == userId, Builders<TwitchAccountDTO>.Update.Set(x => x.Login, userLogin).Set(x => x.DisplayName, userLogin).Set(x => x.RecordInsertTime, DateTimeOffset.UtcNow.ToUnixTimeSeconds()), new UpdateOptions() { IsUpsert = true });
+        }
+
         public async Task<IEnumerable<TwitchAccountDTO>> GetTwitchAccounts(IEnumerable<string> userIds)
         {
             var twitchAccounts = _databaseService.GetTwitchAccountsStaticCollection();
@@ -45,7 +58,20 @@ namespace TwitchLogger.Website.Services
 
             var user = await GetTwitchAccountByLogin(param);
             if (user == null)
-                return string.Empty;
+            {
+                var userId = await _memoryCache.GetOrCreateAsync($"user_{param}", async entry =>
+                {
+                    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                    return await TwitchGraphQL.GetUserID(param);
+                });
+
+                if (string.IsNullOrEmpty(userId))
+                    return string.Empty;
+
+                await InsertTwitchAccountLogin(userId, param);
+
+                return userId;
+            }
 
             return user.UserId;
         }

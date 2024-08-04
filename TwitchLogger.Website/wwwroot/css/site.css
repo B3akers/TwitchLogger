@@ -15,6 +15,12 @@ div.pinned {
     height: 100%;
 }
 
+.prevent-select {
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+} 
+
 .sidebar-panel {
     background-color: #1f1f23;
     width: 240px;
@@ -87,17 +93,24 @@ a:hover {
     cursor: pointer;
 }
 
-.container-logs {
-    max-height: 400px;
+.container-table-logs {
+    max-height: 500px;
     overflow-y: scroll;
     white-space: nowrap;
-    margin-bottom: 1rem;
+    margin: 1.5rem;
+}
+
+.container-logs {
+    max-height: calc(80vh);
+    overflow-y: scroll;
+    white-space: nowrap;
+    margin: 3.5rem;
 }
 
 .txt {
     position: absolute;
     top: 5px;
-    right: 15px;
+    right: 2.5rem;
     opacity: 0.9;
     cursor: pointer;
     z-index: 999;
