@@ -2,6 +2,7 @@
 using MongoDB.Driver;
 using TwitchLogger.DTO;
 using TwitchLogger.Website.Interfaces;
+using TwitchLogger.Website.Models;
 
 namespace TwitchLogger.Website.Services
 {
@@ -17,7 +18,7 @@ namespace TwitchLogger.Website.Services
             _ignoreCaseCollation = new Collation("en", strength: CollationStrength.Secondary);
         }
 
-        public async Task<IEnumerable<TwitchWordUserStatDTO>> GetTopUserWords(string channelId, string user, int year, int limit)
+        public async Task<List<TwitchWordUserStatDTO>> GetTopUserWords(string channelId, string user, int year, int limit)
         {
             var wordUserStats = _databaseService.GetTwitchWordUserStatCollection();
             return await (await wordUserStats.FindAsync(x => x.RoomId == channelId && x.UserId == user && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
@@ -28,7 +29,7 @@ namespace TwitchLogger.Website.Services
             })).ToListAsync();
         }
 
-        public async Task<IEnumerable<TwitchWordUserStatDTO>> GetTopUsers(string channelId, string word, int year, int limit)
+        public async Task<List<TwitchWordUserStatDTO>> GetTopUsers(string channelId, string word, int year, int limit)
         {
             var wordUserStats = _databaseService.GetTwitchWordUserStatCollection();
             return await (await wordUserStats.FindAsync(x => x.RoomId == channelId && x.Word == word && x.Year == year, new FindOptions<TwitchWordUserStatDTO>()
@@ -46,7 +47,7 @@ namespace TwitchLogger.Website.Services
             return await (await usersMessageTime.FindAsync(x => x.UserId == user && x.RoomId == channelId)).FirstOrDefaultAsync();
         }
 
-        public async Task<IEnumerable<TwitchWordStatDTO>> GetTopWords(string channelId, int year, int limit)
+        public async Task<List<TwitchWordStatDTO>> GetTopWords(string channelId, int year, int limit)
         {
             var wordStats = _databaseService.GetTwitchWordStatCollection();
             return await (await wordStats.FindAsync(x => x.RoomId == channelId && x.Year == year, new FindOptions<TwitchWordStatDTO>()
@@ -56,14 +57,35 @@ namespace TwitchLogger.Website.Services
             })).ToListAsync();
         }
 
-        public async Task<IEnumerable<TwitchUserStatDTO>> GetTopChatters(string channelId, int year, int limit)
+        public async Task<List<TwitchWordStatDTO>> GetTopEmotes(string channelId, int year, string[] emotes)
+        {
+            var matchBuilder = Builders<TwitchWordStatDTO>.Filter;
+
+            var wordStats = _databaseService.GetTwitchWordStatCollection();
+            var pipeline = new EmptyPipelineDefinition<TwitchWordStatDTO>()
+                .Match(matchBuilder.Eq(x => x.RoomId, channelId) & matchBuilder.Eq(x => x.Year, year) & matchBuilder.In(x => x.Word, emotes))
+                .Sort(Builders<TwitchWordStatDTO>.Sort.Descending(x => x.Count));
+
+            return await (await wordStats.AggregateAsync(pipeline, new AggregateOptions()
+            {
+                Collation = _ignoreCaseCollation
+            })).ToListAsync();
+        }
+
+        public async Task<List<TwitchUserStatInfo>> GetTopChatters(string channelId, int year, int limit)
         {
             var userStats = _databaseService.GetTwitchUserStatsCollection();
-            return await (await userStats.FindAsync(x => x.RoomId == channelId && x.Year == year, new FindOptions<TwitchUserStatDTO>()
-            {
-                Limit = limit,
-                Sort = Builders<TwitchUserStatDTO>.Sort.Descending(x => x.Messages)
-            })).ToListAsync();
+
+            var project = Builders<TwitchUserStatDTO>.Projection.Expression(item => new TwitchUserStatInfo() { Stat = item });
+
+            var pipeline = new EmptyPipelineDefinition<TwitchUserStatDTO>()
+                .Match(x => x.RoomId == channelId && x.Year == year)
+                .Sort(Builders<TwitchUserStatDTO>.Sort.Descending(x => x.Messages))
+                .Limit(limit)
+                .Project(project)
+                .Lookup(_databaseService.GetTwitchAccountsStaticCollection(), x => x.Stat.UserId, x => x.UserId, (TwitchUserStatInfo p) => p.User);
+
+            return await (await userStats.AggregateAsync(pipeline)).ToListAsync();
         }
 
         public async Task<List<UserTopSubscription>> GetTopSubscriptions(string channelId)

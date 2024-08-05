@@ -15,16 +15,18 @@ namespace TwitchLogger.Website.Controllers
         private readonly IChannelStatsRepository _channelStatsRepository;
         private readonly ITwitchAccountRepository _twitchAccountRepository;
         private readonly IMemoryCache _memoryCache;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly DatabaseService _databaseService;
         private readonly string _dataLogDirectory;
 
-        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache, DatabaseService databaseService)
+        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, DatabaseService databaseService)
         {
             _dataLogDirectory = configuration["Logs:DataLogDirectory"];
             _channelRepository = channelRepository;
             _channelStatsRepository = channelStatsRepository;
             _twitchAccountRepository = twitchAccountRepository;
             _memoryCache = memoryCache;
+            _httpClientFactory = httpClientFactory;
             _databaseService = databaseService;
         }
 
@@ -139,26 +141,65 @@ namespace TwitchLogger.Website.Controllers
             return Json(new { data });
         }
 
-        [HttpPost]
-        public async Task<IActionResult> GetTopChatters([FromBody] GetTopWordsModel model)
+        private TwitchChannelEmoteSetModel ParseEmoteSet(TV7UserEmotesEmoteSet emoteSet)
         {
-            if (!ModelState.IsValid)
-                return Json(new { error = "invalid_model" });
+            if (emoteSet == null)
+            {
+                return new TwitchChannelEmoteSetModel()
+                {
+                    EmotesName = Array.Empty<string>(),
+                    Emotes = Array.Empty<TwitchChannelEmoteModel>()
+                };
+            }
 
-            var data = await _channelStatsRepository.GetTopChatters(model.Id, model.Year);
-            var userData = await _twitchAccountRepository.GetTwitchAccounts(data.Select(x => x.UserId));
+            var emotes = emoteSet?.Emotes;
+            if (emotes == null)
+            {
+                return new TwitchChannelEmoteSetModel()
+                {
+                    EmotesName = Array.Empty<string>(),
+                    Emotes = Array.Empty<TwitchChannelEmoteModel>()
+                };
+            }
 
-            return Json(new { data, userData });
+            var channelEmotesNames = new string[emotes.Count];
+            var channelEmotes = new TwitchChannelEmoteModel[emotes.Count];
+            for (var i = 0; i < emotes.Count; i++)
+            {
+                var emote = emotes[i];
+                var data = emote.Data;
+
+                var emoteUrl = data.Host.Url + "/1x.avif";
+
+                channelEmotesNames[i] = data.Name;
+                channelEmotes[i] = new TwitchChannelEmoteModel()
+                { Name = data.Name, Url = emoteUrl };
+            }
+
+            return new TwitchChannelEmoteSetModel()
+            {
+                EmotesName = channelEmotesNames,
+                Emotes = channelEmotes
+            };
         }
 
         [HttpPost]
-        public async Task<IActionResult> GetTopWords([FromBody] GetTopWordsModel model)
+        public async Task<IActionResult> GetTopStats([FromBody] GetTopWordsModel model)
         {
-            if (!ModelState.IsValid)
-                return Json(new { error = "invalid_model" });
+            var words = await _channelStatsRepository.GetTopWords(model.Id, model.Year);
+            var chatters = await _channelStatsRepository.GetTopChatters(model.Id, model.Year);
 
-            var data = await _channelStatsRepository.GetTopWords(model.Id, model.Year);
-            return Json(new { data });
+            var channelEmotesData = await _memoryCache.GetOrCreateAsync($"7tv_{model.Id}", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                var httpClient = _httpClientFactory.CreateClient();
+                var emotesData = await httpClient.GetFromJsonAsync<TV7UserEmotes>($"https://7tv.io/v3/users/twitch/{model.Id}");
+                return ParseEmoteSet(emotesData?.EmoteSet);
+            });
+
+            var channelEmotes = await _channelStatsRepository.GetTopEmotes(model.Id, model.Year, channelEmotesData.EmotesName);
+
+            return Json(new { words, chatters, channelEmotes, channelEmotesDescriptor = channelEmotesData.Emotes });
         }
 
         [HttpPost]

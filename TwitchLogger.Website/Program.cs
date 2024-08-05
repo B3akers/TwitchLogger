@@ -19,6 +19,7 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddMemoryCache();
 builder.Services.AddResponseCaching();
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<DatabaseService>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<IAccountRepository, AccountRepositoryService>();

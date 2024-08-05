@@ -155,9 +155,28 @@
     <hr />
     <div class="container">
         <div class="row">
+           <div class="col-sm">
+                <h3 class="text-center">Top channels emotes</h3>
+                <div class="container p-3 container-table-logs border">
+                    <table id="tableChannelEmotes" class="table table-hover border-primary table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Emote</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+           </div>
+        </div>
+        <div class="row">
             <div class="col-sm">
                 <h3 class="text-center">Top words</h3>
-                <form class="d-none" data-url="@Url.Action("GetTopWords","Home")" data-callback="getTopWordsSuccess">
+                <form class="d-none" data-url="@Url.Action("GetTopStats","Home")" data-callback="getTopStatsSuccess">
                     <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
                     <input data-form-name="year" value="0" type="hidden">
                     <button type="submit"></button>
@@ -194,11 +213,6 @@
             </div>
             <div class="col-sm">
                 <h3 class="text-center">Top users</h3>
-                <form class="d-none" data-url="@Url.Action("GetTopChatters","Home")" data-callback="getTopChattersSuccess">
-                    <input data-form-name="id" value="@(ViewContext.RouteData.Values["id"])" type="hidden">
-                    <input data-form-name="year" value="0" type="hidden">
-                    <button type="submit"></button>
-                </form>
                 <div class="container p-3 container-table-logs border">
                     <table id="tableUsers" class="table table-hover border-primary table-bordered table-striped">
                         <thead>
@@ -309,6 +323,12 @@
                     <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
                 </div>
             </form>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="" id="userEmotesChecked" onchange="useEmotesInLogs=this.checked;" checked>
+                <label class="form-check-label" for="userEmotesChecked">
+                    Show emotes
+                </label>
+            </div>
             <hr />
         </div>
         <div id="userLogsContainer">
@@ -334,6 +354,12 @@
                     <button type="submit" class="btn btn-primary w-100 mt-2">Get</button>
                 </div>
             </form>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="" id="channelEmotesChecked" onchange="useEmotesInLogs=this.checked;" checked>
+                <label class="form-check-label" for="channelEmotesChecked">
+                    Show emotes
+                </label>
+            </div>
             <div class="container text-center">
                 <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#channelLogFilters" aria-expanded="false" aria-controls="channelLogFilters">
                     Toogle filters
