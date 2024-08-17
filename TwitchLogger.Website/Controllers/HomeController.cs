@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using MongoDB.Driver;
 using System.Diagnostics;
+using System.Threading.Channels;
 using TwitchLogger.SimpleGraphQL;
 using TwitchLogger.Website.Interfaces;
 using TwitchLogger.Website.Models;
@@ -11,23 +12,32 @@ namespace TwitchLogger.Website.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly IUserAuthentication _userAuthentication;
         private readonly IChannelRepository _channelRepository;
         private readonly IChannelStatsRepository _channelStatsRepository;
         private readonly ITwitchAccountRepository _twitchAccountRepository;
         private readonly IMemoryCache _memoryCache;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IOptChannelRepository _optChannelRepository;
         private readonly DatabaseService _databaseService;
         private readonly string _dataLogDirectory;
 
-        public HomeController(IConfiguration configuration, IChannelRepository channelRepository, IChannelStatsRepository channelStatsRepository, ITwitchAccountRepository twitchAccountRepository, IMemoryCache memoryCache, IHttpClientFactory httpClientFactory, DatabaseService databaseService)
+        public HomeController(IConfiguration configuration,
+            IChannelRepository channelRepository,
+            IChannelStatsRepository channelStatsRepository,
+            ITwitchAccountRepository twitchAccountRepository,
+            IMemoryCache memoryCache,
+            IOptChannelRepository optChannelRepository,
+            DatabaseService databaseService,
+            IUserAuthentication userAuthentication)
         {
             _dataLogDirectory = configuration["Logs:DataLogDirectory"];
             _channelRepository = channelRepository;
             _channelStatsRepository = channelStatsRepository;
             _twitchAccountRepository = twitchAccountRepository;
             _memoryCache = memoryCache;
-            _httpClientFactory = httpClientFactory;
             _databaseService = databaseService;
+            _optChannelRepository = optChannelRepository;
+            _userAuthentication = userAuthentication;
         }
 
         public async Task<IActionResult> Index()
@@ -62,11 +72,25 @@ namespace TwitchLogger.Website.Controllers
             if (channel == null)
                 return await Index();
 
+            var isOpt = await _memoryCache.GetOrCreateAsync($"opt_{channel.UserId}", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                return await _optChannelRepository.GetChannelByUserId(channel.UserId) != null;
+            });
+
+            if (isOpt)
+            {
+                var user = await _userAuthentication.GetAuthenticatedUser(HttpContext);
+                if (user != null && (user.IsModerator || user.IsAdmin))
+                    isOpt = false;
+            }
+
             var currentTime = DateTimeOffset.UtcNow;
             var lastMonth = currentTime.AddMonths(-1);
 
             var viewModel = new ChannelViewModel();
             viewModel.Channel = channel;
+            viewModel.IsOpt = isOpt;
             viewModel.Subscriptions = await _channelStatsRepository.GetUniqueSubscriptions(id, lastMonth.ToUnixTimeSeconds(), currentTime.ToUnixTimeSeconds());
             viewModel.TopSubscribers = await _channelStatsRepository.GetTopSubscriptions(id);
 
@@ -141,65 +165,14 @@ namespace TwitchLogger.Website.Controllers
             return Json(new { data });
         }
 
-        private TwitchChannelEmoteSetModel ParseEmoteSet(TV7UserEmotesEmoteSet emoteSet)
-        {
-            if (emoteSet == null)
-            {
-                return new TwitchChannelEmoteSetModel()
-                {
-                    EmotesName = Array.Empty<string>(),
-                    Emotes = Array.Empty<TwitchChannelEmoteModel>()
-                };
-            }
-
-            var emotes = emoteSet?.Emotes;
-            if (emotes == null)
-            {
-                return new TwitchChannelEmoteSetModel()
-                {
-                    EmotesName = Array.Empty<string>(),
-                    Emotes = Array.Empty<TwitchChannelEmoteModel>()
-                };
-            }
-
-            var channelEmotesNames = new string[emotes.Count];
-            var channelEmotes = new TwitchChannelEmoteModel[emotes.Count];
-            for (var i = 0; i < emotes.Count; i++)
-            {
-                var emote = emotes[i];
-                var data = emote.Data;
-
-                var emoteUrl = data.Host.Url + "/1x.avif";
-
-                channelEmotesNames[i] = data.Name;
-                channelEmotes[i] = new TwitchChannelEmoteModel()
-                { Name = data.Name, Url = emoteUrl };
-            }
-
-            return new TwitchChannelEmoteSetModel()
-            {
-                EmotesName = channelEmotesNames,
-                Emotes = channelEmotes
-            };
-        }
-
         [HttpPost]
         public async Task<IActionResult> GetTopStats([FromBody] GetTopWordsModel model)
         {
             var words = await _channelStatsRepository.GetTopWords(model.Id, model.Year);
             var chatters = await _channelStatsRepository.GetTopChatters(model.Id, model.Year);
+            var channelEmotes = await _channelStatsRepository.GetTopEmotes(model.Id, model.Year);
 
-            var channelEmotesData = await _memoryCache.GetOrCreateAsync($"7tv_{model.Id}", async entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
-                var httpClient = _httpClientFactory.CreateClient();
-                var emotesData = await httpClient.GetFromJsonAsync<TV7UserEmotes>($"https://7tv.io/v3/users/twitch/{model.Id}");
-                return ParseEmoteSet(emotesData?.EmoteSet);
-            });
-
-            var channelEmotes = await _channelStatsRepository.GetTopEmotes(model.Id, model.Year, channelEmotesData.EmotesName);
-
-            return Json(new { words, chatters, channelEmotes, channelEmotesDescriptor = channelEmotesData.Emotes });
+            return Json(new { words, chatters, channelEmotes });
         }
 
         [HttpPost]
@@ -228,6 +201,19 @@ namespace TwitchLogger.Website.Controllers
 
             if (!detail.All(char.IsDigit) || !id.All(char.IsDigit) || !year.All(char.IsDigit) || !month.All(char.IsDigit))
                 return BadRequest();
+
+            var isOpt = await _memoryCache.GetOrCreateAsync($"opt_{id}", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1);
+                return await _optChannelRepository.GetChannelByUserId(id) != null;
+            });
+
+            if (isOpt)
+            {
+                var user = await _userAuthentication.GetAuthenticatedUser(HttpContext);
+                if (user == null || (!user.IsModerator && !user.IsAdmin))
+                    return BadRequest();
+            }
 
             var logFile = Path.Combine(_dataLogDirectory, id, type, year, month, detail);
             var logFileGz = $"{logFile}.gz";

@@ -12,11 +12,13 @@ namespace TwitchLogger.Website.Controllers
     {
         private readonly IChannelRepository _channelRepository;
         private readonly IAccountRepository _accountRepository;
+        private readonly IOptChannelRepository _optChannelRepository;
 
-        public AdminController(IChannelRepository channelRepository, IAccountRepository accountRepository)
+        public AdminController(IChannelRepository channelRepository, IAccountRepository accountRepository, IOptChannelRepository optChannelRepository)
         {
             _channelRepository = channelRepository;
             _accountRepository = accountRepository;
+            _optChannelRepository = optChannelRepository;
         }
 
         public IActionResult Index()
@@ -30,6 +32,11 @@ namespace TwitchLogger.Website.Controllers
         }
 
         public IActionResult Channels()
+        {
+            return View();
+        }
+
+        public IActionResult OptChannels()
         {
             return View();
         }
@@ -82,6 +89,56 @@ namespace TwitchLogger.Website.Controllers
             var accounts = await _accountRepository.GetAccounts();
 
             return Json(new { data = accounts.Select(x => new { x.Id, x.Login, x.CreationTime, x.IsModerator, x.IsAdmin }) });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetOptChannels()
+        {
+            var account = HttpContext.Items["userAccount"] as DTO.AccountDTO;
+            if (!account.IsAdmin)
+                return Json(new { error = "server_error" });
+
+            var accounts = await _optChannelRepository.GetChannels();
+
+            return Json(new { data = accounts });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteOptChannel([FromBody] IdModel model)
+        {
+            var account = HttpContext.Items["userAccount"] as DTO.AccountDTO;
+            if (!account.IsAdmin)
+                return Json(new { error = "server_error" });
+
+            if (!ModelState.IsValid)
+                return Json(new { error = "invalid_model" });
+
+            await _optChannelRepository.DeleteChannel(model.Id);
+
+            return Json(new { success = "channel_deleted" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddOptChannel([FromBody] ChannelNameModel model)
+        {
+            if (!ModelState.IsValid)
+                return Json(new { error = "invalid_model" });
+
+            var account = HttpContext.Items["userAccount"] as DTO.AccountDTO;
+            if (!account.IsAdmin)
+                return Json(new { error = "server_error" });
+
+            var userId = await TwitchGraphQL.GetUserID(model.Login);
+            if (string.IsNullOrEmpty(userId))
+                return Json(new { error = "channel_not_found" });
+
+            var channel = await _optChannelRepository.AddChannelByUserId(userId);
+            if (channel == null)
+                return Json(new { error = "channel_not_found" });
+
+            return Json(new { success = "channel_added", channelId = channel.Id });
         }
 
         [HttpPost]

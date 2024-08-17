@@ -1,7 +1,47 @@
-﻿using System.Text.Json.Serialization;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
-namespace TwitchLogger.Website.Models
+namespace TwitchLogger.ChatBot
 {
+    public class BetterTTVEmote
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("code")]
+        public string Code { get; set; }
+        [JsonPropertyName("imageType")]
+        public string ImageType { get; set; }
+        [JsonPropertyName("animated")]
+        public bool Animated { get; set; }
+        [JsonPropertyName("userId")]
+        public string UserId { get; set; }
+        [JsonPropertyName("modifier")]
+        public bool Modifier { get; set; }
+    }
+
+    public class BetterTTVChannel
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("bots")]
+        public List<object> Bots { get; set; }
+
+        [JsonPropertyName("avatar")]
+        public string Avatar { get; set; }
+
+        [JsonPropertyName("channelEmotes")]
+        public BetterTTVEmote[] ChannelEmotes { get; set; }
+
+        [JsonPropertyName("sharedEmotes")]
+        public BetterTTVEmote[] SharedEmotes { get; set; }
+    }
+
     public class TV7UserEmotesConnection
     {
         [JsonPropertyName("id")]

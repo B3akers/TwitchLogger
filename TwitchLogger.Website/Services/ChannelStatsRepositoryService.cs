@@ -57,19 +57,11 @@ namespace TwitchLogger.Website.Services
             })).ToListAsync();
         }
 
-        public async Task<List<TwitchWordStatDTO>> GetTopEmotes(string channelId, int year, string[] emotes)
+        public async Task<List<TwitchEmoteStatDTO>> GetTopEmotes(string channelId, int year)
         {
-            var matchBuilder = Builders<TwitchWordStatDTO>.Filter;
+            var emotes = _databaseService.GetTwitchEmoteStatCollection();
 
-            var wordStats = _databaseService.GetTwitchWordStatCollection();
-            var pipeline = new EmptyPipelineDefinition<TwitchWordStatDTO>()
-                .Match(matchBuilder.Eq(x => x.RoomId, channelId) & matchBuilder.Eq(x => x.Year, year) & matchBuilder.In(x => x.Word, emotes))
-                .Sort(Builders<TwitchWordStatDTO>.Sort.Descending(x => x.Count));
-
-            return await (await wordStats.AggregateAsync(pipeline, new AggregateOptions()
-            {
-                Collation = _ignoreCaseCollation
-            })).ToListAsync();
+            return await (await emotes.FindAsync(x => x.RoomId == channelId && x.Year == year)).ToListAsync();
         }
 
         public async Task<List<TwitchUserStatInfo>> GetTopChatters(string channelId, int year, int limit)

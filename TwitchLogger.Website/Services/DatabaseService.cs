@@ -20,6 +20,9 @@ namespace TwitchLogger.Website.Services
         private readonly IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
         private readonly IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
         private readonly IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
+        private readonly IMongoCollection<TwitchEmoteStatDTO> _twitchEmoteStatCollection;
+        private readonly IMongoCollection<TwitchOptChannelDTO> _twitchOptChannelColletion;
+
 
         public DatabaseService(IConfiguration configuration)
         {
@@ -36,6 +39,8 @@ namespace TwitchLogger.Website.Services
             _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
             _twitchWordUserStatCollection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>("twitch_word_user_stats");
             _twitchWordStatCollection = _mongoDatabase.GetCollection<TwitchWordStatDTO>("twitch_word_stats");
+            _twitchEmoteStatCollection = _mongoDatabase.GetCollection<TwitchEmoteStatDTO>("twitch_emote_stats");
+            _twitchOptChannelColletion = _mongoDatabase.GetCollection<TwitchOptChannelDTO>("twitch_opt_channels");
         }
 
         public MongoClient GetMongoClient()
@@ -46,6 +51,11 @@ namespace TwitchLogger.Website.Services
         public IMongoDatabase GetMongoDatabase()
         {
             return _mongoDatabase;
+        }
+
+        public IMongoCollection<TwitchOptChannelDTO> GetOptChannelsColletion()
+        {
+            return _twitchOptChannelColletion;
         }
 
         public IMongoCollection<AccountDTO> GetAccountsCollection()
@@ -96,6 +106,11 @@ namespace TwitchLogger.Website.Services
         public IMongoCollection<TwitchWordStatDTO> GetTwitchWordStatCollection()
         {
             return _twitchWordStatCollection;
+        }
+
+        public IMongoCollection<TwitchEmoteStatDTO> GetTwitchEmoteStatCollection()
+        {
+            return _twitchEmoteStatCollection;
         }
 
         public async Task<Tuple<long, long>> GetDatabaseStats()

@@ -8,5 +8,6 @@ namespace TwitchLogger.Website.Models
         public ChannelDTO Channel { get; set; }
         public List<SubscriptionPlanInfo> Subscriptions { get; set; }
         public List<UserTopSubscription> TopSubscribers { get; set; }
+        public bool IsOpt { get; set; }
     }
 }

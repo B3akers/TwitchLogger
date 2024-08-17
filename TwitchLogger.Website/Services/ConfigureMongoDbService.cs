@@ -24,7 +24,7 @@ namespace TwitchLogger.Website.Services
 
             var channels = _databaseService.GetChannelsCollection();
             await channels.Indexes.CreateOneAsync(new CreateIndexModel<ChannelDTO>(Builders<ChannelDTO>.IndexKeys.Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }));
-          
+
             var twitchAccountsStatic = _databaseService.GetTwitchAccountsStaticCollection();
             await twitchAccountsStatic.Indexes.CreateOneAsync(new CreateIndexModel<TwitchAccountDTO>(Builders<TwitchAccountDTO>.IndexKeys.Ascending(x => x.UserId), new CreateIndexOptions() { Unique = true }));
 
@@ -57,11 +57,23 @@ namespace TwitchLogger.Website.Services
                 new CreateIndexModel<TwitchWordUserStatDTO>(Builders<TwitchWordUserStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Word).Descending(x => x.Count), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary) })
             });
 
+            var twitchEmoteStat = _databaseService.GetTwitchEmoteStatCollection();
+            await twitchEmoteStat.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchEmoteStatDTO>(Builders<TwitchEmoteStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Emote), new CreateIndexOptions() {Unique = true })
+            });
+
             var twitchWordStat = _databaseService.GetTwitchWordStatCollection();
             await twitchWordStat.Indexes.CreateManyAsync(new[]
             {
                 new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Word), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
                 new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Count))
+            });
+
+            var twitchChannelOpt = _databaseService.GetOptChannelsColletion();
+            await twitchChannelOpt.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchOptChannelDTO>(Builders<TwitchOptChannelDTO>.IndexKeys.Ascending(x => x.TwitchId), new CreateIndexOptions() {Unique = true })
             });
         }
 

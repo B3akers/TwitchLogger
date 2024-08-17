@@ -61,16 +61,19 @@
                 Top user words
             </span>
         </li>
-        <li class="nav-item text-center m-3 flex-fill">
-            <span data-subtab="userLogs" class="nav-link cursor-pointer">
-                User logs
-            </span>
-        </li>
-        <li class="nav-item text-center m-3 flex-fill">
-            <span data-subtab="channelLogs" class="nav-link cursor-pointer">
-                Channel logs
-            </span>
-        </li>
+        @if (!Model.IsOpt)
+        {
+            <li class="nav-item text-center m-3 flex-fill">
+                <span data-subtab="userLogs" class="nav-link cursor-pointer">
+                    User logs
+                </span>
+            </li>
+            <li class="nav-item text-center m-3 flex-fill">
+                <span data-subtab="channelLogs" class="nav-link cursor-pointer">
+                    Channel logs
+                </span>
+            </li>
+        }
     </ul>
     <hr />
 </div>
@@ -155,23 +158,57 @@
     <hr />
     <div class="container">
         <div class="row">
-           <div class="col-sm">
-                <h3 class="text-center">Top channels emotes</h3>
+            <div class="col-sm">
+                <h3 class="text-center">Top 7tv emotes</h3>
                 <div class="container p-3 container-table-logs border">
-                    <table id="tableChannelEmotes" class="table table-hover border-primary table-bordered table-striped">
+                    <table id="table7tvEmotes" class="table table-fixed table-hover border-primary table-bordered table-striped">
                         <thead>
                             <tr>
-                                <th scope="col">#</th>
-                                <th scope="col">Emote</th>
-                                <th scope="col">Name</th>
-                                <th scope="col">Count</th>
+                                <th scope="col" style="width:15%">#</th>
+                                <th scope="col" style="width:20%">Emote</th>
+                                <th scope="col" style="width:40%">Name</th>
+                                <th scope="col" style="width:25%">Count</th>
                             </tr>
                         </thead>
                         <tbody>
                         </tbody>
                     </table>
                 </div>
-           </div>
+            </div>
+            <div class="col-sm">
+                <h3 class="text-center">Top bttv emotes</h3>
+                <div class="container p-3 container-table-logs border">
+                    <table id="tableBttvEmotes" class="table table-fixed table-hover border-primary table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width:15%">#</th>
+                                <th scope="col" style="width:20%">Emote</th>
+                                <th scope="col" style="width:40%">Name</th>
+                                <th scope="col" style="width:25%">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-sm">
+                <h3 class="text-center">Top twitch emotes</h3>
+                <div class="container p-3 container-table-logs border">
+                    <table id="tableTwitchEmotes" class="table table-fixed table-hover border-primary table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width:15%">#</th>
+                                <th scope="col" style="width:20%">Emote</th>
+                                <th scope="col" style="width:40%">Name</th>
+                                <th scope="col" style="width:25%">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <div class="row">
             <div class="col-sm">

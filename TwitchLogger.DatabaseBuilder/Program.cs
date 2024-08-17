@@ -10,6 +10,10 @@ using System.Threading.Channels;
 using System.Collections.Generic;
 using System.Threading;
 using System;
+using TwitchLogger.ChatBot;
+using System.Net.Http;
+using System.Net.Http.Json;
+using static MongoDB.Driver.WriteConcern;
 
 public class Pair<T1, T2>
 {
@@ -23,7 +27,17 @@ public class Pair3<T1, T2, T3>
     public T2 Second { get; set; }
     public T3 Third { get; set; }
 }
+public class EmoteData
+{
+    public string Url { get; set; }
+    public string Type { get; set; }
+}
 
+public struct EmoteInfo
+{
+    public string Type;
+    public string Url;
+}
 class Program
 {
     private static IMongoDatabase _mongoDatabase;
@@ -35,8 +49,55 @@ class Program
     private static IMongoCollection<TwitchUserStatDTO> _twitchUserStatsCollection;
     private static IMongoCollection<TwitchWordUserStatDTO> _twitchWordUserStatCollection;
     private static IMongoCollection<TwitchWordStatDTO> _twitchWordStatCollection;
+    private static IMongoCollection<TwitchEmoteStatDTO> _twitchEmoteStatCollection;
 
     private static Collation ignoreCaseCollation = new Collation("en", strength: CollationStrength.Secondary);
+    private static Dictionary<string, Dictionary<string, EmoteData>> _channelsEmotesSet = new Dictionary<string, Dictionary<string, EmoteData>>();
+
+    private static void ParseTwitchEmoteSet(IEnumerable<TwitchEmote> emoteSet, Dictionary<string, EmoteData> emotesDict)
+    {
+        if (emoteSet == null)
+            return;
+
+        foreach (var emote in emoteSet)
+        {
+            var emoteUrl = $"https://static-cdn.jtvnw.net/emoticons/v2/{emote.Id}/default/dark/1.0";
+
+            emotesDict[emote.Token] = new EmoteData() { Url = emoteUrl, Type = "twitch" };
+        }
+    }
+
+    private static void ParseBetterTTVEmoteSet(BetterTTVEmote[] emoteSet, Dictionary<string, EmoteData> emotesDict)
+    {
+        if (emoteSet == null)
+            return;
+
+        for (var i = 0; i < emoteSet.Length; i++)
+        {
+            var emote = emoteSet[i];
+            var emoteUrl = $"https://cdn.betterttv.net/emote/{emote.Id}/1x";
+
+            emotesDict[emote.Code] = new EmoteData() { Url = emoteUrl, Type = "bttv" };
+        }
+    }
+
+    private static void Parse7tvEmoteSet(TV7UserEmotesEmoteSet emoteSet, Dictionary<string, EmoteData> emotesDict)
+    {
+        if (emoteSet == null)
+            return;
+
+        var emotes = emoteSet?.Emotes;
+        if (emotes == null)
+            return;
+
+        for (var i = 0; i < emotes.Count; i++)
+        {
+            var emote = emotes[i];
+            var emoteUrl = emote.Data.Host.Url + "/1x.avif";
+
+            emotesDict[emote.Name] = new EmoteData() { Url = emoteUrl, Type = "7tv" };
+        }
+    }
 
     static async Task<Tuple<string, long>> GetChannelInfoFromFile(string file)
     {
@@ -110,7 +171,7 @@ class Program
         return true;
     }
 
-    static HashSet<string> GetWords(string message, out int initLen)
+    static HashSet<string> GetWords(string message, out int initLen, HashSet<string> allWords)
     {
         HashSet<string> list = new(StringComparer.InvariantCultureIgnoreCase);
         var splited = message.Split(' ');
@@ -120,6 +181,7 @@ class Program
             if (!string.IsNullOrEmpty(word) && IsLegalUnicode(word))
             {
                 list.Add(word);
+                allWords.Add(word);
             }
         }
 
@@ -140,6 +202,103 @@ class Program
        new SemaphoreSlim(1, 1),
        new SemaphoreSlim(1, 1)
     };
+
+    private static object _lockwrite = new object();
+    private static long totalProcessedLines = 0;
+
+    static void ProcessLogFileForEmotes(string file)
+    {
+        long currentProcessedLines = 0;
+
+        var isGz = file.EndsWith(".gz");
+
+        using (FileStream fileStream = File.OpenRead(file))
+        {
+            Stream stream = fileStream;
+
+            if (isGz)
+                stream = new GZipStream(fileStream, CompressionMode.Decompress, true);
+
+            using (StreamReader streamReader = new StreamReader(stream, System.Text.Encoding.UTF8))
+            {
+                Dictionary<string, EmoteInfo> usedEmotes = new Dictionary<string, EmoteInfo>();
+                Dictionary<string, int> usedEmotesCount = new Dictionary<string, int>();
+
+                string roomId = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(file)))));
+                int year = int.Parse(Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(file))));
+
+                _channelsEmotesSet.TryGetValue(roomId, out var customChannelEmotes);
+
+                while (true)
+                {
+                    var command = streamReader.ReadLine();
+                    if (command == null) break;
+
+                    currentProcessedLines++;
+
+                    var commandArgs = command.Split(' ');
+                    if (commandArgs[2] != "PRIVMSG")
+                        continue;
+
+                    string channel = commandArgs[3].Trim();
+                    string message = commandArgs.Length > 4 ? string.Join(' ', commandArgs.Skip(4)).Substring(1) : "";
+                    if (!string.IsNullOrEmpty(message) && message[0] == '\x01')
+                    {
+                        var msgStartIndex = message.IndexOf(' ');
+                        if (msgStartIndex != -1)
+                            message = message.Substring(msgStartIndex + 1, message.Length - msgStartIndex - 2);
+                    }
+
+                    HashSet<string> allWords = new HashSet<string>();
+                    GetWords(message, out var initLen, allWords);
+
+                    foreach (var word in allWords)
+                    {
+                        if (customChannelEmotes != null)
+                        {
+                            if (customChannelEmotes.TryGetValue(word, out var emoteData))
+                            {
+                                usedEmotes[word] = new EmoteInfo() { Type = emoteData.Type, Url = emoteData.Url };
+                                usedEmotesCount.TryGetValue(word, out var count);
+                                usedEmotesCount[word] = count + 1;
+                            }
+                        }
+                    }
+                }
+
+                List<UpdateOneModel<TwitchEmoteStatDTO>> emoteStatUpdates = new List<UpdateOneModel<TwitchEmoteStatDTO>>(usedEmotes.Count * 2);
+                var filterEmoteStat = Builders<TwitchEmoteStatDTO>.Filter;
+
+                foreach (var emote in usedEmotes)
+                {
+                    var count = (ulong)usedEmotesCount[emote.Key];
+
+                    emoteStatUpdates.Add(new UpdateOneModel<TwitchEmoteStatDTO>(filterEmoteStat.Eq(x => x.RoomId, roomId) & filterEmoteStat.Eq(x => x.Year, 0) & filterEmoteStat.Eq(x => x.Emote, emote.Key), Builders<TwitchEmoteStatDTO>.Update.Inc(x => x.Count, count).Set(x => x.EmoteType, emote.Value.Type).Set(x => x.Url, emote.Value.Url))
+                    {
+                        IsUpsert = true
+                    });
+
+                    emoteStatUpdates.Add(new UpdateOneModel<TwitchEmoteStatDTO>(filterEmoteStat.Eq(x => x.RoomId, roomId) & filterEmoteStat.Eq(x => x.Year, year) & filterEmoteStat.Eq(x => x.Emote, emote.Key), Builders<TwitchEmoteStatDTO>.Update.Inc(x => x.Count, count).Set(x => x.EmoteType, emote.Value.Type).Set(x => x.Url, emote.Value.Url))
+                    {
+                        IsUpsert = true
+                    });
+                }
+
+                if (emoteStatUpdates.Count > 0)
+                {
+                    lock (_lockwrite)
+                    {
+                        _twitchEmoteStatCollection.BulkWrite(emoteStatUpdates);
+                    }
+                }
+
+                if (isGz)
+                    stream.Dispose();
+            }
+        }
+
+        Interlocked.Add(ref totalProcessedLines, currentProcessedLines);
+    }
 
     static async Task ProcessLogFile(string file)
     {
@@ -257,7 +416,8 @@ class Program
                                     list.Second++;
                                 }
 
-                                var wordsMessage = GetWords(message, out var initLen);
+                                HashSet<string> allWords = new HashSet<string>();
+                                var wordsMessage = GetWords(message, out var initLen, allWords);
 
                                 //User stats
                                 {
@@ -541,6 +701,7 @@ class Program
         _twitchUserStatsCollection = _mongoDatabase.GetCollection<TwitchUserStatDTO>("twitch_user_stats");
         _twitchWordUserStatCollection = _mongoDatabase.GetCollection<TwitchWordUserStatDTO>("twitch_word_user_stats");
         _twitchWordStatCollection = _mongoDatabase.GetCollection<TwitchWordStatDTO>("twitch_word_stats");
+        _twitchEmoteStatCollection = _mongoDatabase.GetCollection<TwitchEmoteStatDTO>("twitch_emote_stats");
 
         Console.WriteLine("Starting...");
 
@@ -590,6 +751,11 @@ class Program
                 new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Word), new CreateIndexOptions() { Collation = new Collation("en", strength: CollationStrength.Secondary), Unique = true }),
                 new CreateIndexModel<TwitchWordStatDTO>(Builders<TwitchWordStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Descending(x => x.Count))
             });
+
+            await _twitchEmoteStatCollection.Indexes.CreateManyAsync(new[]
+            {
+                new CreateIndexModel<TwitchEmoteStatDTO>(Builders<TwitchEmoteStatDTO>.IndexKeys.Ascending(x => x.RoomId).Ascending(x => x.Year).Ascending(x => x.Emote), new CreateIndexOptions() {Unique = true })
+            });
         }
 
         Console.WriteLine("Indexes done...");
@@ -598,6 +764,11 @@ class Program
 
         if (!Directory.Exists(logsPath))
             return;
+
+        HttpClient httpClient = new HttpClient();
+
+        var globalEmotes7Yv = await httpClient.GetFromJsonAsync<TV7UserEmotesEmoteSet>("https://7tv.io/v3/emote-sets/global");
+        var betterTTVEmotes = await httpClient.GetFromJsonAsync<BetterTTVEmote[]>("https://api.betterttv.net/3/cached/emotes/global");
 
         var directories = Directory.GetDirectories(logsPath);
         for (var i = 0; i < directories.Length; i++)
@@ -654,18 +825,60 @@ class Program
 
             if (!channelExisted || !skipExistingChannels)
             {
+                var channelEmotes = new Dictionary<string, EmoteData>();
+
+                try
+                {
+                    var channel7Tv = await httpClient.GetFromJsonAsync<TV7UserEmotes>("https://7tv.io/v3/users/twitch/" + channelData.Id);
+                    if (channel7Tv.EmoteSet != null)
+                    {
+                        Parse7tvEmoteSet(globalEmotes7Yv, channelEmotes);
+                        Parse7tvEmoteSet(channel7Tv.EmoteSet, channelEmotes);
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    var emotes = await TwitchGraphQL.GetChannelEmotes(channelData.Id);
+                    ParseTwitchEmoteSet(TwitchGraphQL.TwitchGlobalEmotes, channelEmotes);
+                    ParseTwitchEmoteSet(emotes, channelEmotes);
+                }
+                catch { }
+
+                try
+                {
+                    var channelBttv = await httpClient.GetFromJsonAsync<BetterTTVChannel>("https://api.betterttv.net/3/cached/users/twitch/" + channelData.Id);
+                    if (channelBttv.SharedEmotes != null
+                        || channelBttv.ChannelEmotes != null)
+                    {
+                        ParseBetterTTVEmoteSet(betterTTVEmotes, channelEmotes);
+                        ParseBetterTTVEmoteSet(channelBttv.SharedEmotes, channelEmotes);
+                        ParseBetterTTVEmoteSet(channelBttv.ChannelEmotes, channelEmotes);
+                    }
+                }
+                catch { }
+
+                _channelsEmotesSet[channelData.Id] = channelEmotes;
+
                 var currentFiles = 0;
                 var files = logsFiles.Where(x => x.Item1 >= startDate && x.Item1 < endDate).Select(x => x.Item2).ToList();
-                await Parallel.ForEachAsync(files, new ParallelOptions { MaxDegreeOfParallelism = 15 }, async (item, cancellationToken) =>
+
+                totalProcessedLines = 0;
+
+                Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = -1 }, item =>
                 {
-                    await ProcessLogFile(item);
+                    ProcessLogFileForEmotes(item);
                     Console.WriteLine($"Done item process {++currentFiles}/{files.Count}");
                 });
+
+                Console.WriteLine($"{channelData.Login} processed {totalProcessedLines}");
             }
 
             Console.WriteLine($"Done channel process {i + 1}/{directories.Length}");
         }
 
         Console.WriteLine("Imported!");
+        Console.ReadLine();
     }
 }

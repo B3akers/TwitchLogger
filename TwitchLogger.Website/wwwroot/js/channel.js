@@ -148,16 +148,34 @@ function loadMessagesForContainer(container, cursor) {
             span.style.color = command.params.color;
             span.innerText = command.params.displayName;
 
-   
+
             const spanMessage = document.createElement('span');
             if (useEmotesInLogs) {
                 const words = command.params.message.split(' ');
+                const emotes = command.params.emotes;
+                const twitchParsedEmotes = {};
+                if (emotes) {
+                    const twitchEmotes = emotes.split('/');
+                    for (let y = 0; y < twitchEmotes.length; y++) {
+                        const twitchEmoteData = twitchEmotes[y].split(':');
+                        const position = twitchEmoteData[1].split(',')[0].split('-');
+                        const emoteWord = command.params.message.substring(parseInt(position[0]), parseInt(position[1]) + 1);
+
+                        twitchParsedEmotes[emoteWord] = twitchEmoteData[0];
+                    }
+                }
 
                 let currentMessage = '';
-
                 for (let y = 0; y < words.length; y++) {
                     const word = words[y];
-                    const emoteUrl = channelChatInfo?.emotes[word] ?? '';
+                    let emoteUrl = channelChatInfo?.emotes[word] ?? '';
+                    if (!emoteUrl) {
+                        const emoteData = twitchParsedEmotes[word];
+                        if (emoteData) {
+                            emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${emoteData}/default/dark/1.0`;
+                        }               
+                    }
+
                     if (emoteUrl) {
                         const partMessage = document.createElement('span');
                         partMessage.innerText = currentMessage;
@@ -278,6 +296,7 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
             const color = senderInfos["color"] ?? '#FF4500';
             const badges = senderInfos["badges"].split(',');
             const displayName = senderInfos["display-name"];
+            const emotes = senderInfos["emotes"] ?? '';
 
             parsedMessages.push({
                 type: logType,
@@ -288,6 +307,7 @@ function parseMessagesFromRaw(data, pinMessageId, isChannelLog) {
                     message: message,
                     displayName: displayName,
                     color: color,
+                    emotes: emotes,
                     badges: badges,
                     isMeCommand: isMeCommand
                 }
@@ -347,7 +367,11 @@ function createIndexesForLogs(userId, logTime, filters) {
 
     if (filters.length > 0) {
         for (let i = 0; i < messages.length; i++) {
-            const message = messages[i];
+            const command = messages[i];
+            if (command.type != 'MESSAGE') {
+                continue;
+            }
+            const message = command.params;
 
             let passed = 0;
 
@@ -813,14 +837,11 @@ function getTopWordsSuccess(json) {
     }
 }
 
-function fillEmotesTable(tbody, emotes, emotesDescriptor) {
+function fillEmotesTable(tbody, emotes) {
     tbody.innerHTML = '';
 
-    const descriptor = {};
-    for (let i = 0; i < emotesDescriptor.length; i++) {
-        const item = emotesDescriptor[i];
-
-        descriptor[item.name.toLowerCase()] = { name: item.name, url: item.url };
+    if (!emotes) {
+        return;
     }
 
     for (let i = 0; i < emotes.length; i++) {
@@ -835,15 +856,16 @@ function fillEmotesTable(tbody, emotes, emotesDescriptor) {
         const tdName = document.createElement('td');
         const tdCount = document.createElement('td');
 
-        const emoteData = descriptor[item.word.toLowerCase()] ?? { name: item.word, url: '' };
         const emoteImg = document.createElement('img');
-        emoteImg.setAttribute('src', emoteData.url);
-        emoteImg.setAttribute('alt', emoteData.name);
-        emoteImg.setAttribute('title', emoteData.name);
+        emoteImg.setAttribute('src', item.url);
+        emoteImg.setAttribute('alt', item.emote);
+        emoteImg.setAttribute('title', item.emote);
+        emoteImg.style.maxWidth = '57px';
 
         tdEmote.appendChild(emoteImg);
 
-        tdName.innerText = emoteData.name;
+        tdName.style.whiteSpace = 'wrap';
+        tdName.innerText = item.emote;
         tdCount.innerText = item.count.toLocaleString();
 
         tr.appendChild(th);
@@ -859,7 +881,37 @@ function getTopStatsSuccess(json) {
     getTopWordsSuccess(json.words);
     getTopChattersSuccess(json.chatters);
 
-    fillEmotesTable(document.getElementById('tableChannelEmotes').querySelector('tbody'), json.channelEmotes, json.channelEmotesDescriptor);
+    const emotes = {};
+
+    for (let i = 0; i < json.channelEmotes.length; i++) {
+        const emote = json.channelEmotes[i];
+
+        if (!emotes[emote.emoteType]) {
+            emotes[emote.emoteType] = [];
+        }
+
+        emotes[emote.emoteType].push(emote);
+    }
+
+    const keys = Object.keys(emotes);
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const arr = emotes[key];
+
+        arr.sort((a, b) => {
+            if (a.count < b.count) {
+                return 1;
+            }
+            if (a.count > b.count) {
+                return -1;
+            }
+            return 0;
+        });
+    }
+
+    fillEmotesTable(document.getElementById('table7tvEmotes').querySelector('tbody'), emotes['7tv']);
+    fillEmotesTable(document.getElementById('tableBttvEmotes').querySelector('tbody'), emotes['bttv']);
+    fillEmotesTable(document.getElementById('tableTwitchEmotes').querySelector('tbody'), emotes['twitch']);
 }
 
 function getUserStatsSuccess(json) {
@@ -902,6 +954,29 @@ function onYearSwitch(e) {
                 form.requestSubmit(form.querySelector('button[type="submit"]'));
             }
         }
+    }
+}
+
+function parse7tvEmotes(emotes) {
+    if (!emotes)
+        return;
+
+    for (let y = 0; y < emotes.length; y++) {
+        const emote = emotes[y];
+        const name = emote.name;
+        const url = emote.data.host.url + "/1x.avif";
+
+        channelChatInfo.emotes[name] = url;
+    }
+}
+
+function parseBetterTTVEmotes(emotes) {
+    if (!emotes)
+        return;
+
+    for (let y = 0; y < emotes.length; y++) {
+        const emote = emotes[y];
+        channelChatInfo.emotes[emote.code] = `https://cdn.betterttv.net/emote/${emote.id}/1x`;
     }
 }
 
@@ -1030,16 +1105,16 @@ function onTabSwitch(e) {
             channelChatInfo.emotes = {};
 
             const roomId = document.querySelector('form[data-callback="getUserLogsTimesSuccess"] input[type="hidden"]').value;
-            const promisesType = ['badges', '7tvChannell', 'betterttvChannell', 'frankerfacezChannell', 'betterttvGlobal', 'frankerfacezGlobal', '7tvGlobal'];
+            const promisesType = ['badges', '7tvChannell', '7tvGlobal', 'betterttvGlobal', 'betterttvChannell', 'frankerfacezChannell', 'frankerfacezGlobal'];
 
             Promise.allSettled([fetch(getChannelBadgesUrl),
-                fetch(`https://7tv.io/v3/users/twitch/${roomId}`),
+            fetch(`https://7tv.io/v3/users/twitch/${roomId}`),
+            fetch('https://7tv.io/v3/emote-sets/global'),
+            fetch('https://api.betterttv.net/3/cached/emotes/global'),
+            fetch(`https://api.betterttv.net/3/cached/users/twitch/${roomId}`),
                 /*
-                fetch(`https://api.betterttv.net/3/cached/users/twitch/${roomId}`),
                 fetch(`https://api.frankerfacez.com/v1/room/id/${roomId}`),    
-                fetch('https://api.betterttv.net/3/cached/emotes/global'),
-                fetch('https://api.frankerfacez.com/v1/set/global'),
-                fetch('https://7tv.io/v3/emote-sets/global')*/
+                fetch('https://api.frankerfacez.com/v1/set/global'),*/
             ]
             ).then((results) => {
                 const resultsPromises = [];
@@ -1075,17 +1150,14 @@ function onTabSwitch(e) {
                             channelChatInfo.badges = badges;
                         } else if (resultsPromisesType[i] == '7tvChannell') {
                             const emotes = jsonValue?.emote_set?.emotes;
-                            if (emotes) {         
-                                for (let y = 0; y < emotes.length; y++) {
-                                    const emote = emotes[y];
-                                    const data = emote.data;
-
-                                    const name = data.name;
-                                    const url = data.host.url + "/1x.avif";
-
-                                    channelChatInfo.emotes[name] = url;
-                                }
-                            }
+                            parse7tvEmotes(emotes);
+                        } else if (resultsPromisesType[i] == '7tvGlobal') {
+                            parse7tvEmotes(jsonValue?.emotes);
+                        } else if (resultsPromisesType[i] == 'betterttvGlobal') {
+                            parseBetterTTVEmotes(jsonValue);
+                        } else if (resultsPromisesType[i] == 'betterttvChannell') {
+                            parseBetterTTVEmotes(jsonValue.channelEmotes);
+                            parseBetterTTVEmotes(jsonValue.sharedEmotes);
                         }
                     }
 
