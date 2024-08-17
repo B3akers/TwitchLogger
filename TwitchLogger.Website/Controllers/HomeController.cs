@@ -81,7 +81,7 @@ namespace TwitchLogger.Website.Controllers
             if (isOpt)
             {
                 var user = await _userAuthentication.GetAuthenticatedUser(HttpContext);
-                if (user != null && (user.IsModerator || user.IsAdmin))
+                if (user != null)
                     isOpt = false;
             }
 
@@ -211,7 +211,7 @@ namespace TwitchLogger.Website.Controllers
             if (isOpt)
             {
                 var user = await _userAuthentication.GetAuthenticatedUser(HttpContext);
-                if (user == null || (!user.IsModerator && !user.IsAdmin))
+                if (user == null)
                     return BadRequest();
             }
 
